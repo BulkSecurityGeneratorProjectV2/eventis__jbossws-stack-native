@@ -28,6 +28,8 @@ package javax.xml.soap;
  */
 public class SOAPException extends Exception
 {
+   private static final long serialVersionUID = 5083961510786058130L;
+
    public SOAPException()
    {
    }

@@ -23,10 +23,10 @@ package org.jboss.ws.metadata.umdm;
 
 // $Id$
 
-import javax.xml.namespace.QName;
-
 import org.jboss.ws.metadata.config.ConfigurationProvider;
 import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedHandlerMetaData.HandlerType;
+
+import javax.xml.namespace.QName;
 
 /**
  * Client side endpoint meta data.
@@ -38,20 +38,16 @@ public class ClientEndpointMetaData extends EndpointMetaData
 {
    // The endpoint address
    private String endpointAddress;
-
+   
    public ClientEndpointMetaData(ServiceMetaData service, QName qname, QName portTypeName, Type type)
    {
       super(service, qname, portTypeName, type);
-      String configName = ConfigurationProvider.DEFAULT_CLIENT_CONFIG_NAME;
+      configName = ConfigurationProvider.DEFAULT_CLIENT_CONFIG_NAME;
 
-      String configFile;
       if (type == Type.JAXRPC)
          configFile = ConfigurationProvider.DEFAULT_JAXRPC_CLIENT_CONFIG_FILE;
-      else configFile = ConfigurationProvider.DEFAULT_JAXWS_CLIENT_CONFIG_FILE;
-
-      EndpointConfigMetaData ecmd = getEndpointConfigMetaData();
-      ecmd.setConfigName(configName);
-      ecmd.setConfigFile(configFile);
+      else
+         configFile = ConfigurationProvider.DEFAULT_JAXWS_CLIENT_CONFIG_FILE;
    }
 
    public String getEndpointAddress()
@@ -62,11 +58,6 @@ public class ClientEndpointMetaData extends EndpointMetaData
    public void setEndpointAddress(String endpointAddress)
    {
       this.endpointAddress = endpointAddress;
-   }
-
-   public EndpointConfigMetaData createEndpointConfigMetaData(String configName, String configFile)
-   {
-      return super.createEndpointConfigMetaData(configName, configFile);
    }
 
    public String toString()

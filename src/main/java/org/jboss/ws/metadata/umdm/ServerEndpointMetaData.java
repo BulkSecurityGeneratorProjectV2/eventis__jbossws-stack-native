@@ -77,17 +77,12 @@ public class ServerEndpointMetaData extends EndpointMetaData
    {
       super(service, portName, portTypeName, type);
       this.endpoint = endpoint;
-
-      String configName = ConfigurationProvider.DEFAULT_ENDPOINT_CONFIG_NAME;
-      String configFile;
+      
+      super.configName = ConfigurationProvider.DEFAULT_ENDPOINT_CONFIG_NAME;
       if (type == Type.JAXRPC)
          configFile = ConfigurationProvider.DEFAULT_JAXRPC_ENDPOINT_CONFIG_FILE;
       else
          configFile = ConfigurationProvider.DEFAULT_JAXWS_ENDPOINT_CONFIG_FILE;
-
-      EndpointConfigMetaData ecmd = getEndpointConfigMetaData();
-      ecmd.setConfigName(configName);
-      ecmd.setConfigFile(configFile);
    }
 
    public Endpoint getEndpoint()
@@ -207,7 +202,7 @@ public class ServerEndpointMetaData extends EndpointMetaData
    {
       if (endpoint == null)
          throw new IllegalStateException("Endpoint not available");
-
+      
       endpoint.setAddress(endpointAddress);
    }
 

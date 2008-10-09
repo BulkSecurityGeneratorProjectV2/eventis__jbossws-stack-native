@@ -35,7 +35,6 @@ import javax.xml.ws.handler.PortInfo;
 import org.jboss.logging.Logger;
 import org.jboss.ws.core.server.ServerHandlerDelegate;
 import org.jboss.ws.core.soap.MessageContextAssociation;
-import org.jboss.ws.metadata.umdm.EndpointConfigMetaData;
 import org.jboss.ws.metadata.umdm.EndpointMetaData;
 import org.jboss.ws.metadata.umdm.ServerEndpointMetaData;
 import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedHandlerMetaData.HandlerType;
@@ -51,11 +50,11 @@ public class HandlerDelegateJAXWS extends ServerHandlerDelegate
    // provide logging
    private static Logger log = Logger.getLogger(HandlerDelegateJAXWS.class);
    private HandlerResolverImpl resolver = new HandlerResolverImpl();
-
+   
    private ThreadLocal<HandlerChainExecutor> preExecutor = new ThreadLocal<HandlerChainExecutor>();
    private ThreadLocal<HandlerChainExecutor> jaxwsExecutor = new ThreadLocal<HandlerChainExecutor>();
    private ThreadLocal<HandlerChainExecutor> postExecutor = new ThreadLocal<HandlerChainExecutor>();
-
+   
    public HandlerDelegateJAXWS(ServerEndpointMetaData sepMetaData)
    {
       super(sepMetaData);
@@ -64,7 +63,7 @@ public class HandlerDelegateJAXWS extends ServerHandlerDelegate
 
    /**
     * For JAXWS PRE/POST are defined in the context of an outbound message
-    */
+    */ 
    public HandlerType[] getHandlerTypeOrder()
    {
       return new HandlerType[] { HandlerType.POST, HandlerType.ENDPOINT, HandlerType.PRE };
@@ -77,10 +76,9 @@ public class HandlerDelegateJAXWS extends ServerHandlerDelegate
       // Initialize the handler chain
       if (isInitialized() == false)
       {
-         EndpointConfigMetaData ecmd = sepMetaData.getEndpointConfigMetaData();
-         resolver.initHandlerChain(ecmd, HandlerType.PRE, true);
-         resolver.initHandlerChain(ecmd, HandlerType.ENDPOINT, true);
-         resolver.initHandlerChain(ecmd, HandlerType.POST, true);
+         resolver.initHandlerChain(sepMetaData, HandlerType.PRE, true);
+         resolver.initHandlerChain(sepMetaData, HandlerType.ENDPOINT, true);
+         resolver.initHandlerChain(sepMetaData, HandlerType.POST, true);
          setInitialized(true);
       }
 
@@ -92,7 +90,7 @@ public class HandlerDelegateJAXWS extends ServerHandlerDelegate
    public boolean callResponseHandlerChain(ServerEndpointMetaData sepMetaData, HandlerType type)
    {
       log.debug("callResponseHandlerChain: " + type);
-      HandlerChainExecutor executor = getExecutor(type);
+      HandlerChainExecutor executor =  getExecutor(type);
       MessageContext msgContext = (MessageContext)MessageContextAssociation.peekMessageContext();
       return (executor != null ? executor.handleMessage(msgContext) : true);
    }
@@ -100,7 +98,7 @@ public class HandlerDelegateJAXWS extends ServerHandlerDelegate
    public void closeHandlerChain(ServerEndpointMetaData sepMetaData, HandlerType type)
    {
       log.debug("closeHandlerChain");
-      HandlerChainExecutor executor = getExecutor(type);
+      HandlerChainExecutor executor =  getExecutor(type);
       MessageContext msgContext = (MessageContext)MessageContextAssociation.peekMessageContext();
       if (executor != null)
       {
@@ -108,11 +106,11 @@ public class HandlerDelegateJAXWS extends ServerHandlerDelegate
          removeExecutor(type);
       }
    }
-
+   
    public boolean callFaultHandlerChain(ServerEndpointMetaData sepMetaData, HandlerType type, Exception ex)
    {
       log.debug("callFaultHandlerChain: " + type);
-      HandlerChainExecutor executor = getExecutor(type);
+      HandlerChainExecutor executor =  getExecutor(type);
       MessageContext msgContext = (MessageContext)MessageContextAssociation.peekMessageContext();
       return (executor != null ? executor.handleFault(msgContext, ex) : true);
    }
@@ -141,7 +139,7 @@ public class HandlerDelegateJAXWS extends ServerHandlerDelegate
    {
       if (type == HandlerType.ALL)
          throw new IllegalArgumentException("Invalid handler type: " + type);
-
+      
       HandlerChainExecutor executor = new HandlerChainExecutor(sepMetaData, getHandlerChain(sepMetaData, type));
       if (type == HandlerType.PRE)
          preExecutor.set(executor);
@@ -149,7 +147,7 @@ public class HandlerDelegateJAXWS extends ServerHandlerDelegate
          jaxwsExecutor.set(executor);
       else if (type == HandlerType.POST)
          postExecutor.set(executor);
-
+      
       return executor;
    }
 
@@ -157,7 +155,7 @@ public class HandlerDelegateJAXWS extends ServerHandlerDelegate
    {
       if (type == HandlerType.ALL)
          throw new IllegalArgumentException("Invalid handler type: " + type);
-
+      
       HandlerChainExecutor executor = null;
       if (type == HandlerType.PRE)
          executor = preExecutor.get();
@@ -165,7 +163,7 @@ public class HandlerDelegateJAXWS extends ServerHandlerDelegate
          executor = jaxwsExecutor.get();
       else if (type == HandlerType.POST)
          executor = postExecutor.get();
-
+      
       return executor;
    }
 
@@ -173,7 +171,7 @@ public class HandlerDelegateJAXWS extends ServerHandlerDelegate
    {
       if (type == HandlerType.ALL)
          throw new IllegalArgumentException("Invalid handler type: " + type);
-
+      
       if (type == HandlerType.PRE)
          preExecutor.remove();
       else if (type == HandlerType.ENDPOINT)

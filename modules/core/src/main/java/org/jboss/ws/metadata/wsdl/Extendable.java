@@ -38,12 +38,15 @@ import org.jboss.logging.Logger;
  */
 public abstract class Extendable implements Serializable
 {
+   private static final long serialVersionUID = -3164210175211099488L;
+
    // provide logging
    private Logger log = Logger.getLogger(getClass());
    
    private Map features = new LinkedHashMap();
    private Map properties = new LinkedHashMap();
    private Map<String,List<WSDLExtensibilityElement>> extElements = new LinkedHashMap<String,List<WSDLExtensibilityElement>>();
+   private List<WSDLExtensibilityElement> notUnderstoodExtElements = new LinkedList<WSDLExtensibilityElement>();
 
    public WSDLFeature[] getFeatures()
    {
@@ -112,5 +115,28 @@ public abstract class Extendable implements Serializable
          list.addAll(extElements.get(k));
       }
       return list;
+   }
+
+   public List<WSDLExtensibilityElement> getNotUnderstoodExtElements()
+   {
+      if (notUnderstoodExtElements == null)
+      {
+         notUnderstoodExtElements = new LinkedList<WSDLExtensibilityElement>();
+      }
+      return notUnderstoodExtElements;
+   }
+
+   public void setNotUnderstoodExtElements(List<WSDLExtensibilityElement> notUnderstoodExtElement)
+   {
+      this.notUnderstoodExtElements = notUnderstoodExtElement;
+   }
+   
+   public void addNotUnderstoodExtElement(WSDLExtensibilityElement element)
+   {
+      if (notUnderstoodExtElements == null)
+      {
+         notUnderstoodExtElements = new LinkedList<WSDLExtensibilityElement>();
+      }
+      notUnderstoodExtElements.add(element);
    }
 }

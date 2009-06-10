@@ -30,15 +30,16 @@ import javax.xml.transform.Source;
 import javax.xml.ws.Endpoint;
 import javax.xml.ws.EndpointReference;
 import javax.xml.ws.Service;
+import javax.xml.ws.WebServiceException;
 import javax.xml.ws.WebServiceFeature;
 import javax.xml.ws.soap.SOAPBinding;
-import javax.xml.ws.spi.Provider21;
+import javax.xml.ws.spi.Provider;
 import javax.xml.ws.spi.ServiceDelegate;
-import javax.xml.ws.spi.ServiceDelegate21;
 import javax.xml.ws.wsaddressing.W3CEndpointReference;
-import javax.xml.ws.wsaddressing.W3CEndpointReferenceBuilder;
 
-import org.jboss.util.NotImplementedException;
+import org.jboss.ws.core.jaxws.wsaddressing.EndpointReferenceUtil;
+import org.jboss.ws.core.jaxws.wsaddressing.NativeEndpointReference;
+import org.jboss.wsf.common.DOMUtils;
 import org.w3c.dom.Element;
 
 /**
@@ -47,7 +48,7 @@ import org.w3c.dom.Element;
  * @author Thomas.Diesler@jboss.com
  * @since 03-May-2006
  */
-public class ProviderImpl extends Provider21
+public class ProviderImpl extends Provider
 {
    // 6.2 Conformance (Concrete javax.xml.ws.spi.Provider required): An implementation MUST provide
    // a concrete class that extends javax.xml.ws.spi.Provider. Such a class MUST have a public constructor
@@ -60,6 +61,7 @@ public class ProviderImpl extends Provider21
    public ServiceDelegate createServiceDelegate(URL wsdlLocation, QName serviceName, Class serviceClass)
    {
       ServiceDelegateImpl delegate = new ServiceDelegateImpl(wsdlLocation, serviceName, serviceClass);
+      DOMUtils.clearThreadLocals();
       return delegate;
    }
 
@@ -108,23 +110,17 @@ public class ProviderImpl extends Provider21
    }
 
    @Override
-   public <T extends EndpointReference> T createEndpointReference(Class<T> clazz, QName serviceName, QName portName, Source wsdlDocumentLocation,
-         Element... referenceParameters)
-   {
-      throw new NotImplementedException();
-   }
-
-   @Override
    public W3CEndpointReference createW3CEndpointReference(String address, QName serviceName, QName portName, List<Element> metadata, String wsdlDocumentLocation,
          List<Element> referenceParameters)
    {
-      W3CEndpointReferenceBuilder builder = new W3CEndpointReferenceBuilder();
-      builder = builder.address(address).serviceName(serviceName).endpointName(portName).wsdlDocumentLocation(wsdlDocumentLocation);
-      for (Element el : metadata)
-         builder = builder.metadata(el);
-      for (Element el : referenceParameters)
-         builder = builder.referenceParameter(el);
-      return builder.build();
+      NativeEndpointReference epr = new NativeEndpointReference();
+      epr.setAddress(address);
+      epr.setServiceName(serviceName);
+      epr.setEndpointName(portName);
+      epr.setMetadata(metadata);
+      epr.setWsdlLocation(wsdlDocumentLocation);
+      epr.setReferenceParameters(referenceParameters);
+      return EndpointReferenceUtil.transform(W3CEndpointReference.class, epr);
    }
 
    @Override
@@ -132,19 +128,27 @@ public class ProviderImpl extends Provider21
    {
       URL wsdlLocation = null;
       QName serviceName = null;
-      if (epr instanceof W3CEndpointReference)
-      {
-         W3CEndpointReference w3c = (W3CEndpointReference)epr;
-         wsdlLocation = w3c.getWsdlLocation();
-         serviceName = w3c.getServiceName();
-      }
-      ServiceDelegate21 delegate = (ServiceDelegate21)createServiceDelegate(wsdlLocation, serviceName, Service.class);
+      NativeEndpointReference nepr = EndpointReferenceUtil.transform(NativeEndpointReference.class, epr);
+      
+      wsdlLocation = nepr.getWsdlLocation();
+      serviceName = nepr.getServiceName();
+      ServiceDelegate delegate = createServiceDelegate(wsdlLocation, serviceName, Service.class);
       return delegate.getPort(epr, sei, features);
    }
 
    @Override
    public EndpointReference readEndpointReference(Source eprInfoset)
    {
-      throw new NotImplementedException();
+      if (eprInfoset == null)
+         throw new NullPointerException("Provided eprInfoset cannot be null");
+      try
+      {
+         //we currently support W3CEndpointReference only
+         return new W3CEndpointReference(eprInfoset);
+      }
+      catch (Exception e)
+      {
+         throw new WebServiceException(e);
+      }
    }
 }

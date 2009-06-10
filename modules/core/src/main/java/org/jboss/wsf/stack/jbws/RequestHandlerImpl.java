@@ -86,6 +86,11 @@ import org.jboss.ws.feature.JsonEncodingFeature;
 import org.jboss.ws.metadata.umdm.EndpointMetaData;
 import org.jboss.ws.metadata.umdm.ServerEndpointMetaData;
 import org.jboss.ws.metadata.umdm.EndpointMetaData.Type;
+import org.jboss.wsf.common.DOMUtils;
+import org.jboss.wsf.common.DOMWriter;
+import org.jboss.wsf.common.IOUtils;
+import org.jboss.wsf.spi.SPIProvider;
+import org.jboss.wsf.spi.SPIProviderResolver;
 import org.jboss.wsf.spi.deployment.Endpoint;
 import org.jboss.wsf.spi.deployment.Endpoint.EndpointState;
 import org.jboss.wsf.spi.invocation.InvocationContext;
@@ -93,11 +98,6 @@ import org.jboss.wsf.spi.invocation.RequestHandler;
 import org.jboss.wsf.spi.management.EndpointMetrics;
 import org.jboss.wsf.spi.management.ServerConfig;
 import org.jboss.wsf.spi.management.ServerConfigFactory;
-import org.jboss.wsf.spi.SPIProviderResolver;
-import org.jboss.wsf.spi.SPIProvider;
-import org.jboss.wsf.common.DOMWriter;
-import org.jboss.wsf.common.DOMUtils;
-import org.jboss.wsf.common.IOUtils;
 import org.w3c.dom.Document;
 
 import com.sun.xml.fastinfoset.dom.DOMDocumentSerializer;
@@ -251,7 +251,7 @@ public class RequestHandlerImpl implements RequestHandler
       else
       {
          msgContext = new SOAPMessageContextJAXWS();
-         msgContext.put(MessageContextJAXWS.MESSAGE_OUTBOUND_PROPERTY, new Boolean(false));
+         msgContext.put(MessageContextJAXWS.MESSAGE_OUTBOUND_PROPERTY, Boolean.valueOf(false));
          msgContext.put(MessageContextJAXWS.INBOUND_MESSAGE_ATTACHMENTS, new HashMap<String, DataHandler>());
          invContext.addAttachment(javax.xml.ws.handler.MessageContext.class, msgContext);
       }
@@ -337,7 +337,6 @@ public class RequestHandlerImpl implements RequestHandler
       }
       finally
       {
-
          // Cleanup outbound attachments
          CommonMessageContext.cleanupAttachments(MessageContextAssociation.peekMessageContext());
 
@@ -346,15 +345,6 @@ public class RequestHandlerImpl implements RequestHandler
 
          // clear thread local storage
          ThreadLocalAssociation.clear();
-         DOMUtils.clearThreadLocals();
-         try
-         {
-            outStream.close();
-         }
-         catch (IOException ex)
-         {
-            WSException.rethrow(ex);
-         }
       }
    }
 
@@ -392,15 +382,8 @@ public class RequestHandlerImpl implements RequestHandler
 
             SOAPEnvelope soapEnv = soapMessage.getSOAPPart().getEnvelope();
             DOMDocumentSerializer serializer = new DOMDocumentSerializer();
-            try
-            {
-               serializer.setOutputStream(output);
-               serializer.serialize(soapEnv);
-            }
-            finally
-            {
-               output.close();
-            }
+            serializer.setOutputStream(output);
+            serializer.serialize(soapEnv);
          }
          // JSON support
          else if (epMetaData.isFeatureEnabled(JsonEncodingFeature.class) && resMessage instanceof SOAPMessage)
@@ -415,14 +398,7 @@ public class RequestHandlerImpl implements RequestHandler
          }
          else
          {
-            try
-            {
-               resMessage.writeTo(output);
-            }
-            finally
-            {
-               output.close();
-            }
+            resMessage.writeTo(output);
          }
       }
    }
@@ -629,17 +605,6 @@ public class RequestHandlerImpl implements RequestHandler
       {
          throw new WSException(ex);
       }
-      finally
-      {
-         try
-         {
-            outStream.close();
-         }
-         catch (IOException ioe)
-         {
-            throw new WSException(ioe);
-         }
-      }
    }
 
    private void handleWSDLRequestFromServletContext(Endpoint endpoint, OutputStream outputStream, InvocationContext context) throws MalformedURLException, IOException
@@ -667,16 +632,8 @@ public class RequestHandlerImpl implements RequestHandler
       WSDLRequestHandler wsdlRequestHandler = new WSDLRequestHandler(epMetaData);
       Document document = wsdlRequestHandler.getDocumentForPath(reqURL, wsdlHost, resPath);
 
-      OutputStreamWriter writer = null;
-      try
-      {
-         writer = new OutputStreamWriter(outputStream);
-         new DOMWriter(writer).setPrettyprint(true).print(document.getDocumentElement());
-      }
-      finally
-      {
-         writer.close();
-      }
+      OutputStreamWriter writer = new OutputStreamWriter(outputStream);
+      new DOMWriter(writer).setPrettyprint(true).print(document.getDocumentElement());
    }
 
    private void handleException(Exception ex) throws ServletException

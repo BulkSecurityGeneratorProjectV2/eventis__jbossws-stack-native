@@ -93,8 +93,8 @@ if $cygwin; then
     JBOSS_ENDORSED_DIRS=`cygpath --path --windows "$JBOSS_ENDORSED_DIRS"`
 fi
 
+# Execute the command
 "$JAVA" $JAVA_OPTS \
    -Djava.endorsed.dirs="$JBOSS_ENDORSED_DIRS" \
-   -Dlog4j.configuration=wstools-log4j.xml \
    -classpath "$WSPROVIDE_CLASSPATH" \
    org.jboss.wsf.spi.tools.cmd.WSProvide "$@"

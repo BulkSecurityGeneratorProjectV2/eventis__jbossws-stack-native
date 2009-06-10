@@ -48,7 +48,6 @@ import javax.xml.ws.http.HTTPBinding;
 import javax.xml.ws.http.HTTPException;
 import javax.xml.ws.soap.SOAPBinding;
 import javax.xml.ws.soap.SOAPFaultException;
-import javax.xml.ws.wsaddressing.BindingProvider21;
 
 import org.jboss.remoting.transport.http.HTTPMetadataConstants;
 import org.jboss.util.NotImplementedException;
@@ -87,7 +86,7 @@ import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedHandlerMetaData.Handler
  * @author Thomas.Diesler@jboss.org
  * @since 04-Jul-2006
  */
-public class ClientImpl extends CommonClient implements org.jboss.ws.extensions.wsrm.api.RMProvider, BindingProvider21
+public class ClientImpl extends CommonClient implements org.jboss.ws.extensions.wsrm.api.RMProvider, BindingProvider
 {
 
    // the associated endpoint meta data
@@ -171,7 +170,7 @@ public class ClientImpl extends CommonClient implements org.jboss.ws.extensions.
    protected boolean callRequestHandlerChain(QName portName, HandlerType type)
    {
       BindingExt binding = (BindingExt)getBindingProvider().getBinding();
-      HandlerChainExecutor executor = new HandlerChainExecutor(epMetaData, binding.getHandlerChain(type));
+      HandlerChainExecutor executor = new HandlerChainExecutor(epMetaData, binding.getHandlerChain(type), false);
       executorMap.put(type, executor);
 
       MessageContext msgContext = (MessageContext)MessageContextAssociation.peekMessageContext();
@@ -454,12 +453,12 @@ public class ClientImpl extends CommonClient implements org.jboss.ws.extensions.
 
    public EndpointReference getEndpointReference()
    {
-      throw new NotImplementedException();
+      return bindingProvider.getEndpointReference();
    }
 
    public <T extends EndpointReference> T getEndpointReference(Class<T> clazz)
    {
-      throw new NotImplementedException();
+      return bindingProvider.getEndpointReference(clazz);
    }
 
    public EndpointConfigMetaData getEndpointConfigMetaData()
@@ -502,7 +501,11 @@ public class ClientImpl extends CommonClient implements org.jboss.ws.extensions.
          for (Handler bindingHandler : binding.getHandlerChain(type))
          {
             if (bindingHandler instanceof SOAPHandler)
-               headers.addAll(((SOAPHandler)bindingHandler).getHeaders());
+            {
+               Set<QName> understoodHeaders = ((SOAPHandler)bindingHandler).getHeaders();
+               if (understoodHeaders != null)
+                  headers.addAll(understoodHeaders);
+            }
          }
       }
 

@@ -24,15 +24,8 @@ package javax.xml.ws;
 /**
  * @author Heiko.Braun@jboss.com
  */
+@Deprecated
 public interface Binding21 extends Binding
 {
-   /**
-    * Get the URI for this binding instance.
-    *
-    * @return String The binding identifier for the port.
-    *    Never returns <code>null</code>
-    *
-    * @since JAX-WS 2.1
-    */
-   String getBindingID();
+
 }

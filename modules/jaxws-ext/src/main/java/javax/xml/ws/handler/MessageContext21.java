@@ -24,15 +24,8 @@ package javax.xml.ws.handler;
 /**
  * @author Heiko.Braun@jboss.com
  */
+@Deprecated
 public interface MessageContext21 extends MessageContext
 {
-   /**
-    * Standard property: WS Addressing Reference Parameters.
-    * The list MUST include all SOAP headers marked with the
-    * wsa:IsReferenceParameter="true" attribute.
-    * <p>Type: List<Element>
-    *
-    * @since JAX-WS 2.1
-    */
-   public static final String REFERENCE_PARAMETERS = "javax.xml.ws.reference.parameters";
+
 }

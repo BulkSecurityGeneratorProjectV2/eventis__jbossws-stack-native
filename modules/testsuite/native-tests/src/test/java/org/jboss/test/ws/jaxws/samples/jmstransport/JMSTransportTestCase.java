@@ -21,7 +21,6 @@
  */
 package org.jboss.test.ws.jaxws.samples.jmstransport;
 
-import java.io.File;
 import java.net.URL;
 
 import javax.jms.Message;
@@ -43,7 +42,6 @@ import org.jboss.wsf.test.JBossWSTestSetup;
 import org.jboss.wsf.common.DOMUtils;
 
 import junit.framework.Test;
-
 
 /**
  * A web service client that connects to a MDB endpoint.
@@ -123,12 +121,12 @@ public class JMSTransportTestCase extends JBossWSTest
       message.setJMSReplyTo(resQueue);
 
       waitForResponse = true;
-      
+
       QueueSender sender = session.createSender(reqQueue);
       sender.send(message);
       sender.close();
 
-      int timeout = 5000;
+      int timeout = 30000;
       while (waitForResponse && timeout > 0)
       {
          Thread.sleep(100);

@@ -27,8 +27,11 @@ import java.net.URL;
 
 import org.jboss.logging.Logger;
 import org.jboss.ws.metadata.umdm.EndpointMetaData;
-import org.jboss.wsf.spi.management.ServerConfig;
 import org.jboss.wsf.common.DOMUtils;
+import org.jboss.wsf.spi.SPIProvider;
+import org.jboss.wsf.spi.SPIProviderResolver;
+import org.jboss.wsf.spi.management.ServerConfig;
+import org.jboss.wsf.spi.management.ServerConfigFactory;
 import org.w3c.dom.Attr;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -85,11 +88,32 @@ public class WSDLRequestHandler
       // get some imported resource
       else
       {
-         String impResourcePath = new File(wsdlLocation.getPath()).getParent() + File.separatorChar + resPath;
+         File wsdlLocFile = new File(wsdlLocation.getPath());
+         String impResourcePath = wsdlLocFile.getParent() + File.separatorChar + resPath;
          File impResourceFile = new File(impResourcePath);
+         String wsdlPublishLoc = epMetaData.getServiceMetaData().getWsdlPublishLocation();
 
-         Element wsdlElement = DOMUtils.parse(impResourceFile.toURL().openStream());
-         wsdlDoc = wsdlElement.getOwnerDocument();
+         log.debug("Importing resource file: " + impResourceFile.getCanonicalPath());
+
+         String wsdlLocFilePath = wsdlLocFile.getParentFile().getCanonicalPath();
+         SPIProvider spiProvider = SPIProviderResolver.getInstance().getProvider();
+         ServerConfig serverConfig = spiProvider.getSPI(ServerConfigFactory.class).getServerConfig();
+         String wsdlDataLoc = serverConfig.getServerDataDir().getCanonicalPath() + File.separatorChar + "wsdl";
+
+         //allow wsdl file's parent or server's data/wsdl or overriden wsdl publish directories only
+         String resourceAbsPath = impResourceFile.getCanonicalPath(); 
+         if (resourceAbsPath.indexOf(wsdlLocFilePath) >= 0
+             || resourceAbsPath.indexOf(wsdlDataLoc) >= 0
+             || (wsdlPublishLoc != null 
+                  && resourceAbsPath.indexOf(new File(new URL(wsdlPublishLoc).getPath()).getCanonicalPath()) >= 0))
+         {
+            Element wsdlElement = DOMUtils.parse(impResourceFile.toURL().openStream());
+            wsdlDoc = wsdlElement.getOwnerDocument();
+         }
+         else
+         {
+            throw new IOException("Access to '" + resourceAbsPath + "' resource is not allowed");
+         }
       }
 
       modifyAddressReferences(reqURL, wsdlHost, resPath, wsdlDoc.getDocumentElement());
@@ -184,22 +208,19 @@ public class WSDLRequestHandler
                   String orgLocation = locationAttr.getNodeValue();
 
                   URL orgURL = new URL(orgLocation);
-                  String orgProtocol = orgURL.getProtocol();
                   String orgHost = orgURL.getHost();
-                  int orgPort = orgURL.getPort();
                   String orgPath = orgURL.getPath();
 
                   if (ServerConfig.UNDEFINED_HOSTNAME.equals(orgHost))
                   {
                      URL newURL = new URL(wsdlHost); 
+                     String newProtocol = newURL.getProtocol();
                      String newHost = newURL.getHost();
                      int newPort = newURL.getPort();
                      
-                     String newLocation = orgProtocol + "://" + newHost;
+                     String newLocation = newProtocol + "://" + newHost;
                      if (newPort != -1)
                         newLocation += ":" + newPort;
-                     else if (orgPort != -1)
-                        newLocation += ":" + orgPort;
                      
                      newLocation += orgPath;
                      locationAttr.setNodeValue(newLocation);

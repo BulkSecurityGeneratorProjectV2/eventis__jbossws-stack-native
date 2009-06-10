@@ -21,10 +21,11 @@
  */
 package org.jboss.ws.extensions.validation;
 
-import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.net.URL;
+import java.io.StringReader;
 
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -32,6 +33,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import org.jboss.wsf.common.DOMWriter;
 import org.w3c.dom.Element;
 import org.xml.sax.ErrorHandler;
+import org.xml.sax.InputSource;
 
 /**
  * [JBWS-1172] Support schema validation for incoming messages
@@ -57,8 +59,7 @@ public class SchemaValidationHelper
 
    public void validateDocument(String inxml) throws Exception
    {
-      ByteArrayInputStream bais = new ByteArrayInputStream(inxml.getBytes());
-      validateDocument(bais);
+      validateDocument(new InputSource(new StringReader(inxml)));
    }
 
    public void validateDocument(Element inxml) throws Exception
@@ -73,6 +74,12 @@ public class SchemaValidationHelper
       builder.parse(inxml);
    }
    
+   public void validateDocument(InputSource inxml) throws Exception
+   {
+      DocumentBuilder builder = getDocumentBuilder();
+      builder.parse(inxml);
+   }
+   
    private DocumentBuilder getDocumentBuilder() throws ParserConfigurationException
    {
       DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -80,6 +87,7 @@ public class SchemaValidationHelper
       factory.setNamespaceAware(true);
       factory.setAttribute("http://java.sun.com/xml/jaxp/properties/schemaLanguage", "http://www.w3.org/2001/XMLSchema");
       factory.setAttribute("http://java.sun.com/xml/jaxp/properties/schemaSource", xsdURL.toExternalForm());
+      factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
       DocumentBuilder builder = factory.newDocumentBuilder();
       builder.setErrorHandler(errorHandler);
       return builder;

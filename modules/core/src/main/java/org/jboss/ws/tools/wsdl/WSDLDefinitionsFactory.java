@@ -35,7 +35,10 @@ import org.xml.sax.EntityResolver;
 import javax.wsdl.Definition;
 import javax.wsdl.factory.WSDLFactory;
 import javax.wsdl.xml.WSDLReader;
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+
 import java.io.InputStream;
 import java.io.StringWriter;
 import java.net.ConnectException;
@@ -85,7 +88,7 @@ public class WSDLDefinitionsFactory
     */
    public void setFeature(String name, boolean value) throws IllegalArgumentException
    {
-      features.put(name, new Boolean(value));
+      features.put(name, Boolean.valueOf(value));
    }
 
    /**
@@ -107,7 +110,7 @@ public class WSDLDefinitionsFactory
          String defaultNamespace = getDefaultNamespace(wsdlDoc);
          if (Constants.NS_WSDL11.equals(defaultNamespace))
          {
-            WSDLFactory wsdlFactory = WSDLFactory.newInstance(JBossWSDLFactoryImpl.class.getName());
+            WSDLFactory wsdlFactory = WSDLFactory.newInstance(JBossWSDLFactoryImpl.class.getName(), this.getClass().getClassLoader());
             WSDLReader wsdlReader = wsdlFactory.newWSDLReader();
             wsdlReader.setFeature("javax.wsdl.verbose", false);
 
@@ -164,7 +167,14 @@ public class WSDLDefinitionsFactory
          InputStream inputStream = new ResourceURL(wsdlLocation).openStream();
          try
          {
-            DocumentBuilder builder = DOMUtils.getDocumentBuilder();
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+
+            factory.setNamespaceAware(true);
+            factory.setValidating(false);
+
+            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            builder.setEntityResolver( new JBossWSEntityResolver() );
             return builder.parse(inputStream);
          }
          finally

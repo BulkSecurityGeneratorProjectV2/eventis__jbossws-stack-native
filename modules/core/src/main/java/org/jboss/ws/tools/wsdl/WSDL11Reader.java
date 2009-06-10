@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -313,32 +314,77 @@ public class WSDL11Reader
       for (int i = 0; i < extElements.size(); i++)
       {
          ExtensibilityElement extElement = (ExtensibilityElement)extElements.get(i);
-         processPolicyElements(extElement, dest);
-         //add processing of further extensibility element types below
+         if (extElement instanceof UnknownExtensibilityElement)
+         {
+            UnknownExtensibilityElement uee = (UnknownExtensibilityElement)extElement;
+            boolean understood = false;
+            understood = understood || processPolicyElements(uee, dest);
+            understood = understood || processUseAddressing(uee, dest);
+            //add processing of further extensibility element types below
+            
+            if (!understood)
+            {
+               processNotUnderstoodExtesibilityElement(uee, dest);
+            }
+         }
       }
    }
 
-   private void processPolicyElements(ExtensibilityElement extElement, Extendable dest)
+   /**
+    * Process the provided extensibility element looking for policies or policy references.
+    * Returns true if the provided element is policy related, false otherwise.
+    * 
+    * @param extElement
+    * @param dest
+    * @return
+    */
+   private boolean processPolicyElements(UnknownExtensibilityElement extElement, Extendable dest)
    {
-      if (extElement instanceof UnknownExtensibilityElement)
+      boolean result = false;
+      Element srcElement = extElement.getElement();
+      if (Constants.URI_WS_POLICY.equals(srcElement.getNamespaceURI()))
       {
-         Element srcElement = ((UnknownExtensibilityElement)extElement).getElement();
-         if (Constants.URI_WS_POLICY.equals(srcElement.getNamespaceURI()))
+         //copy missing namespaces from the source element to our element
+         Element element = (Element)srcElement.cloneNode(true);
+         copyMissingNamespaceDeclarations(element, srcElement);
+         if (element.getLocalName().equals("Policy"))
          {
-            //copy missing namespaces from the source element to our element
-            Element element = (Element)srcElement.cloneNode(true);
-            copyMissingNamespaceDeclarations(element, srcElement);
-            if (element.getLocalName().equals("Policy"))
-            {
-               dest.addExtensibilityElement(new WSDLExtensibilityElement(Constants.WSDL_ELEMENT_POLICY, element));
-            }
-            else if (element.getLocalName().equals("PolicyReference"))
-            {
-               dest.addExtensibilityElement(new WSDLExtensibilityElement(Constants.WSDL_ELEMENT_POLICYREFERENCE, element));
-            }
-
+            WSDLExtensibilityElement el = new WSDLExtensibilityElement(Constants.WSDL_ELEMENT_POLICY, element);
+            el.setRequired("true".equalsIgnoreCase(element.getAttribute("required")));
+            dest.addExtensibilityElement(el);
+            result = true;
+         }
+         else if (element.getLocalName().equals("PolicyReference"))
+         {
+            WSDLExtensibilityElement el = new WSDLExtensibilityElement(Constants.WSDL_ELEMENT_POLICYREFERENCE, element);
+            el.setRequired("true".equalsIgnoreCase(element.getAttribute("required")));
+            dest.addExtensibilityElement(el);
+            result = true;
          }
       }
+      return result;
+   }
+   
+   /**
+    * Process the provided extensibility element looking for UsingAddressing.
+    * Returns true if the provided element is UsingAddressing, false otherwise.
+    * 
+    * @param extElement
+    * @param dest
+    * @return
+    */
+   private boolean processUseAddressing(UnknownExtensibilityElement extElement, Extendable dest)
+   {
+      log.warn("UsingAddressing extensibility element not supported yet.");
+      return false;
+   }
+   
+   private void processNotUnderstoodExtesibilityElement(UnknownExtensibilityElement extElement, Extendable dest)
+   {
+      Element element = (Element)extElement.getElement().cloneNode(true);
+      WSDLExtensibilityElement notUnderstoodElement = new WSDLExtensibilityElement("notUnderstoodExtensibilityElement", element);
+      notUnderstoodElement.setRequired("true".equalsIgnoreCase(element.getAttributeNS(Constants.NS_WSDL11, "required")));
+      dest.addNotUnderstoodExtElement(notUnderstoodElement);
    }
 
    private void processTypes(Definition srcWsdl, URL wsdlLoc) throws IOException, WSDLException
@@ -377,18 +423,21 @@ public class WSDL11Reader
             String localname = domElementClone.getLocalName();
             try
             {
+               List<URL> published = new LinkedList<URL>();
                if ("import".equals(localname))
                {
-                  processSchemaImport(destTypes, wsdlLoc, domElementClone);
+                  processSchemaImport(destTypes, wsdlLoc, domElementClone, published);
                }
                else if ("schema".equals(localname))
                {
-                  processSchemaInclude(destTypes, wsdlLoc, domElementClone);
+                  processSchemaInclude(destTypes, wsdlLoc, domElementClone, published);
                }
                else
                {
                   throw new IllegalArgumentException("Unsuported schema element: " + localname);
                }
+               published.clear();
+               published = null;
             }
             catch (IOException e)
             {
@@ -480,7 +529,7 @@ public class WSDL11Reader
       }
    }
 
-   private void processSchemaImport(WSDLTypes types, URL wsdlLoc, Element importEl) throws IOException, WSDLException
+   private void processSchemaImport(WSDLTypes types, URL wsdlLoc, Element importEl, List<URL> published) throws IOException, WSDLException
    {
       if (wsdlLoc == null)
          throw new IllegalArgumentException("Cannot process import, parent location not set");
@@ -493,12 +542,16 @@ public class WSDL11Reader
 
       URL locationURL = getLocationURL(wsdlLoc, location);
       Element rootElement = DOMUtils.parse(new ResourceURL(locationURL).openStream());
-      URL newloc = processSchemaInclude(types, locationURL, rootElement);
-      if (newloc != null)
-         importEl.setAttribute("schemaLocation", newloc.toExternalForm());
+      if (!published.contains(locationURL))
+      {
+         published.add(locationURL);
+         URL newloc = processSchemaInclude(types, locationURL, rootElement,  published);
+         if (newloc != null)
+            importEl.setAttribute("schemaLocation", newloc.toExternalForm());
+      }
    }
 
-   private URL processSchemaInclude(WSDLTypes types, URL wsdlLoc, Element schemaEl) throws IOException, WSDLException
+   private URL processSchemaInclude(WSDLTypes types, URL wsdlLoc, Element schemaEl, List<URL> published) throws IOException, WSDLException
    {
       if (wsdlLoc == null)
          throw new IllegalArgumentException("Cannot process iclude, parent location not set");
@@ -527,9 +580,13 @@ public class WSDL11Reader
 
          URL locationURL = getLocationURL(wsdlLoc, location);
          Element rootElement = DOMUtils.parse(new ResourceURL(locationURL).openStream());
-         URL newloc = processSchemaInclude(types, locationURL, rootElement);
-         if (newloc != null)
-            includeEl.setAttribute("schemaLocation", newloc.toExternalForm());
+         if (!published.contains(locationURL))
+         {
+            published.add(locationURL);
+            URL newloc = processSchemaInclude(types, locationURL, rootElement, published);
+            if (newloc != null)
+               includeEl.setAttribute("schemaLocation", newloc.toExternalForm());
+         }
       }
 
       String targetNS = getOptionalAttribute(schemaEl, "targetNamespace");
@@ -587,12 +644,11 @@ public class WSDL11Reader
                
                // Recursively handle schema imports
                Element importedSchema = null;
-               String schema = currLoc.toString();
-               if (entityResolver.getEntityMap().containsKey(schema))
+               if (entityResolver.getEntityMap().containsKey(namespace))
                {
                   try
                   {
-                     importedSchema = DOMUtils.parse(entityResolver.resolveEntity(schema, schema).getByteStream());
+                     importedSchema = DOMUtils.parse(entityResolver.resolveEntity(namespace, namespace).getByteStream());
                   }
                   catch (SAXException se)
                   {

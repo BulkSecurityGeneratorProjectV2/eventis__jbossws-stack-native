@@ -39,8 +39,8 @@ import javax.xml.transform.stream.StreamSource;
 
 import org.jboss.logging.Logger;
 import org.jboss.ws.WSException;
-import org.jboss.ws.core.binding.BufferedStreamResult;
-import org.jboss.ws.core.jaxrpc.binding.BufferedStreamSource;
+import org.jboss.ws.util.xml.BufferedStreamResult;
+import org.jboss.ws.util.xml.BufferedStreamSource;
 import org.jboss.wsf.common.DOMUtils;
 import org.jboss.wsf.common.DOMWriter;
 import org.w3c.dom.Element;
@@ -171,11 +171,15 @@ public class XMLFragment
          else if (source instanceof StreamSource || source instanceof SAXSource)
          {
             StreamSource streamSource = (StreamSource)source;
+            boolean newReader = false;
 
             Reader reader = streamSource.getReader();
             {
                if (reader == null)
+               {
                   reader = new InputStreamReader(streamSource.getInputStream(), "UTF-8");
+                  newReader = true;
+               }
             }
 
             char[] cbuf = new char[1024];
@@ -206,6 +210,9 @@ public class XMLFragment
                len = reader.read(cbuf);
                off = 0;
             }
+            
+            if (newReader)
+               reader.close();
          }
          else
          {

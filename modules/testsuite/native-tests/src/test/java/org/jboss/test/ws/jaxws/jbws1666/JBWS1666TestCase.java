@@ -29,7 +29,6 @@ import java.io.InputStreamReader;
 import junit.framework.Test;
 
 import org.jboss.wsf.test.JBossWSTest;
-import org.jboss.wsf.test.JBossWSTestHelper;
 import org.jboss.wsf.test.JBossWSTestSetup;
 import org.jboss.wsf.common.IOUtils;
 
@@ -73,19 +72,13 @@ public class JBWS1666TestCase extends JBossWSTest
       // Maybe you should extend the Class-Path in the MANIFEST instead.
       StringBuffer cp = new StringBuffer(System.getProperty("test.classes.directory"));
       cp.append(PS + jbc + FS + "jbossws-native-client.jar");
-      if (isTargetJBoss50())
-      {
-         cp.append(PS + jbc + FS + "jboss-common-core.jar");
-         cp.append(PS + jbc + FS + "jboss-logging-spi.jar");
-      }
-      else
-      {
-         cp.append(PS + jbc + FS + "jboss-common-client.jar");
-      }
+      cp.append(PS + jbc + FS + "jboss-common-core.jar");
+      cp.append(PS + jbc + FS + "jboss-logging-spi.jar");
 
       Runtime rt = Runtime.getRuntime();
 
       String command = javaCmd + " -Djava.endorsed.dirs=" + jbl + FS + "endorsed -cp " + cp + " " + TestClient.class.getName() + " " + getServerHost();
+      System.out.println("Executing command: " + command);
       Process proc = rt.exec(command);
       int status = proc.waitFor();
       if (status == 0)

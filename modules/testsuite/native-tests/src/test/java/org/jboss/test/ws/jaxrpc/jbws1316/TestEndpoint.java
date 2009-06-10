@@ -28,7 +28,7 @@ import java.rmi.RemoteException;
  * Simple TestEndpoint to test the handling to WSSE timestamps.
  *
  * @author <a href="mailto:darran.lofthouse@jboss.com">Darran Lofthouse</a>
- * @since Aril 14 2008
+ * @since April 14 2008
  */
 public interface TestEndpoint extends Remote
 {

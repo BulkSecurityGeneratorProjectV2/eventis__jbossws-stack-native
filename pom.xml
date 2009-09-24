@@ -17,7 +17,7 @@
   <artifactId>jbossws-native</artifactId>
   <packaging>pom</packaging>
 
-  <version>3.2.0-SNAPSHOT</version>
+  <version>3.2.1-SNAPSHOT</version>
 
   <!-- Parent -->
   <parent>
@@ -47,37 +47,39 @@
 
   <!-- Properties -->
   <properties>
-    <jbossws.common.version>ropalka-1.2.0-SNAPSHOT</jbossws.common.version>
-    <jbossws.framework.version>ropalka-3.2.0-SNAPSHOT</jbossws.framework.version>
-    <jbossws.spi.version>ropalka-1.2.0-SNAPSHOT</jbossws.spi.version>
-    <jbossws.jboss500.version>3.2.0-SNAPSHOT</jbossws.jboss500.version>
-    <jbossws.jboss501.version>3.2.0-SNAPSHOT</jbossws.jboss501.version>
-    <jbossws.jboss510.version>ropalka-3.2.0-SNAPSHOT</jbossws.jboss510.version>
+    <jbossws.common.version>1.2.1-SNAPSHOT</jbossws.common.version>
+    <jbossws.framework.version>3.2.1-SNAPSHOT</jbossws.framework.version>
+    <jbossws.spi.version>1.2.1-SNAPSHOT</jbossws.spi.version>
+    <jbossws.jboss500.version>3.2.1-SNAPSHOT</jbossws.jboss500.version>
+    <jbossws.jboss501.version>3.2.1-SNAPSHOT</jbossws.jboss501.version>
+    <jbossws.jboss510.version>3.2.1-SNAPSHOT</jbossws.jboss510.version>
     <!-- [JBWS-2505] -->
     <!-- START -->
     <!--
-    <jbossws.jboss520.version>3.2.0-SNAPSHOT</jbossws.jboss520.version>
-    <jbossws.jboss600.version>3.2.0-SNAPSHOT</jbossws.jboss600.version>
+    <jbossws.jboss520.version>3.2.0.GA</jbossws.jboss520.version>
+    <jbossws.jboss600.version>3.2.0.GA</jbossws.jboss600.version>
     -->
     <!-- END -->
     <codehaus.jettison.version>1.0-RC2</codehaus.jettison.version>
     <commons.logging.version>1.1.1</commons.logging.version>
     <javassist.version>3.6.0.GA</javassist.version>
+    <jaxws.api.version>2.1</jaxws.api.version>
+    <jsr181.api.version>1.0-MR1</jsr181.api.version>
     <jaxb.api.version>2.1</jaxb.api.version>
-    <jaxb.impl.version>2.1.6</jaxb.impl.version>
+    <jaxb.impl.version>2.1.9</jaxb.impl.version>
     <jboss.common.version>1.2.1.GA</jboss.common.version>
     <jboss.jaxbintros.version>1.0.0.GA</jboss.jaxbintros.version>
-    <jboss.logging.version>2.0.5.GA</jboss.logging.version>
-    <jboss.remoting.version>2.5.0.SP2</jboss.remoting.version>
-    <jboss.jaxr.version>1.2.1.GA</jboss.jaxr.version>
-    <apache.scout.version>0.7rc2</apache.scout.version>
-    <juddi.version>0.9RC4</juddi.version>
+    <jboss.logging.version>2.2.0.CR1</jboss.logging.version>
+    <jboss.jaxr.version>2.0.1</jboss.jaxr.version>
+    <apache.scout.version>1.1.1</apache.scout.version>
+    <juddi.version>2.0.1</juddi.version>
+    <netty.version>3.1.2.GA</netty.version>
     <sun.fastinfoset.version>1.2.2</sun.fastinfoset.version>
     <sun.jaxws.version>2.1.3</sun.jaxws.version>
     <woodstox.version>3.2.6</woodstox.version>
     <wscommons.policy.version>1.0</wscommons.policy.version>
     <wsdl4j.version>1.6.1</wsdl4j.version>
-    <xmlsec.version>1.4.2</xmlsec.version>
+    <xmlsec.version>1.4.3</xmlsec.version>
     <xalan.version>2.7.0</xalan.version>
     <xerces.version>2.8.1</xerces.version>
   </properties>
@@ -215,11 +217,6 @@
         <artifactId>jboss-common</artifactId>
         <version>${jboss.common.version}</version>
       </dependency>
-      <dependency>
-        <groupId>org.jboss.remoting</groupId>
-        <artifactId>jboss-remoting</artifactId>
-        <version>${jboss.remoting.version}</version>
-      </dependency>
       <!-- transitive dependencies -->
       <dependency>
         <groupId>commons-logging</groupId>
@@ -258,6 +255,34 @@
           <exclusion>
             <groupId>com.sun.xml.stream</groupId>
             <artifactId>sjsxp</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>javax.jws</groupId>
+        <artifactId>jsr181-api</artifactId>
+        <version>${jsr181.api.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>javax.xml.ws</groupId>
+        <artifactId>jaxws-api</artifactId>
+        <version>${jaxws.api.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>javax.jws</groupId>
+            <artifactId>jsr181-api</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>javax.xml.bind</groupId>
+            <artifactId>jaxb-api</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>javax.xml.soap</groupId>
+            <artifactId>saaj-api</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>javax.annotation</groupId>
+            <artifactId>jsr250-api</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -308,6 +333,11 @@
         <version>${jboss.logging.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.jboss.logging</groupId>
+        <artifactId>jboss-logging-spi</artifactId>
+        <version>${jboss.logging.version}</version>
+      </dependency>
+      <dependency>
         <groupId>wscommons-policy</groupId>
         <artifactId>policy</artifactId>
         <version>${wscommons.policy.version}</version>
@@ -336,6 +366,11 @@
         <groupId>org.apache</groupId>
         <artifactId>xmlsec</artifactId>
         <version>${xmlsec.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jboss.netty</groupId>
+        <artifactId>netty</artifactId>
+        <version>${netty.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

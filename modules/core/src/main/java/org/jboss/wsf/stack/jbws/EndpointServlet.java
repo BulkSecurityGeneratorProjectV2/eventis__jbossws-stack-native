@@ -80,11 +80,12 @@ public final class EndpointServlet extends AbstractEndpointServlet
    {
       synchronized(this.preDestroyRegistry)
       {
-         for (PreDestroyHolder holder : this.preDestroyRegistry)
+         for (final PreDestroyHolder holder : this.preDestroyRegistry)
          {
             try
             {
-               InjectionHelper.callPreDestroyMethod(holder.getObject());
+               final Object targetBean = holder.getObject();
+               InjectionHelper.callPreDestroyMethod(targetBean);
             }
             catch (Exception exception)
             {

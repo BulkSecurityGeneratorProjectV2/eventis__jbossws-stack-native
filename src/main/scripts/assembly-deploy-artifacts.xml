@@ -34,6 +34,8 @@
             <includes>
               <include>com.sun.xml.fastinfoset:FastInfoset:jar</include>
               <include>javax.xml.bind:jaxb-api:jar</include>
+              <include>javax.xml.ws:jaxws-api:jar</include>
+              <include>javax.jws:jsr181-api:jar</include>
               <include>com.sun.xml.bind:jaxb-impl:jar</include>
               <include>com.sun.xml.bind:jaxb-xjc:jar</include>
               <include>com.sun.xml.ws:jaxws-tools:jar</include>
@@ -52,6 +54,7 @@
               <include>com.sun.xml.stream.buffer:streambuffer:jar</include>
               <include>wsdl4j:wsdl4j:jar</include>
               <include>org.apache:xmlsec:jar</include>
+              <include>org.jboss.netty:netty:jar</include>
             </includes>
           </dependencySet>
           <dependencySet>

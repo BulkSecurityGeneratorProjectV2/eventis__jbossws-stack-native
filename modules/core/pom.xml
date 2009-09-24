@@ -9,7 +9,7 @@
   <parent>
     <groupId>org.jboss.ws.native</groupId>
     <artifactId>jbossws-native</artifactId>
-    <version>3.2.0-SNAPSHOT</version>
+    <version>3.2.1-SNAPSHOT</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
 
@@ -28,6 +28,11 @@
     <dependency>
       <groupId>org.jboss.ws</groupId>
       <artifactId>jbossws-spi</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.jboss.ws.native</groupId>
+      <artifactId>jbossws-native-jaxws</artifactId>
+      <version>${version}</version>
     </dependency>
     <dependency>
       <groupId>org.jboss.ws.native</groupId>
@@ -105,6 +110,14 @@
     
     <!-- transitve dependencies -->
     <dependency>
+      <groupId>javax.xml.ws</groupId>
+      <artifactId>jaxws-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>javax.jws</groupId>
+      <artifactId>jsr181-api</artifactId>
+    </dependency>
+    <dependency>
       <groupId>commons-logging</groupId>
       <artifactId>commons-logging</artifactId>
     </dependency>
@@ -145,8 +158,8 @@
       <artifactId>jboss-jaxb-intros</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.jboss.remoting</groupId>
-      <artifactId>jboss-remoting</artifactId>
+      <groupId>org.jboss.netty</groupId>
+      <artifactId>netty</artifactId>
     </dependency>
     <dependency>
       <groupId>wscommons-policy</groupId>

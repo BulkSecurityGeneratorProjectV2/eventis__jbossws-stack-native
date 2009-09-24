@@ -208,7 +208,7 @@ public abstract class CommonClient implements StubExt, HeaderSource
    {
       if (epMetaData == null)
       {
-         ClassLoader ctxLoader = Thread.currentThread().getContextClassLoader();
+         ClassLoader ctxLoader = SecurityActions.getContextClassLoader();
          UnifiedVirtualFile vfsRoot = new ResourceLoaderAdapter();
          UnifiedMetaData wsMetaData = new UnifiedMetaData(vfsRoot);
          wsMetaData.setClassLoader(ctxLoader);
@@ -262,8 +262,9 @@ public abstract class CommonClient implements StubExt, HeaderSource
       CommonMessageContext msgContext = MessageContextAssociation.peekMessageContext();
       msgContext.setOperationMetaData(opMetaData);
 
+      Map<String, Object> requestCtx = getRequestContext();
       // Copy properties to the message context
-      msgContext.putAll(getRequestContext());
+      msgContext.putAll(requestCtx);
 
       // The direction of the message
       DirectionHolder direction = new DirectionHolder(Direction.OutBound);
@@ -317,12 +318,14 @@ public abstract class CommonClient implements StubExt, HeaderSource
                   try
                   {
                      URL wsaToURL = new URL(wsaTo);
-                     log.debug("Sending request to addressing destination: " + wsaToURL);
+                     if (log.isDebugEnabled())
+                        log.debug("Sending request to addressing destination: " + wsaToURL);
                      targetAddress = wsaToURL.toExternalForm();
                   }
                   catch (MalformedURLException ex)
                   {
-                     log.debug("Not a valid URL: " + wsaTo);
+                     if (log.isDebugEnabled())
+                        log.debug("Not a valid URL: " + wsaTo);
                   }
                }
             }
@@ -331,16 +334,17 @@ public abstract class CommonClient implements StubExt, HeaderSource
             if (targetAddress == null)
                throw new WSException("Target endpoint address not set");
 
-            Map<String, Object> callProps = new HashMap<String, Object>(getRequestContext());
+            Map<String, Object> callProps = new HashMap<String, Object>(requestCtx);
             EndpointInfo epInfo = new EndpointInfo(epMetaData, targetAddress, callProps);
-            if (shouldMaintainSession())
+            boolean maintainSession = shouldMaintainSession();
+            if (maintainSession)
                addSessionInfo(reqMessage, callProps);
 
             RemoteConnection remoteConnection = new RemoteConnectionFactory().getRemoteConnection(epInfo);
             MessageAbstraction resMessage = remoteConnection.invoke(reqMessage, epInfo, oneway);
 
-            if (shouldMaintainSession())
-               saveSessionInfo(callProps, getRequestContext());
+            if (maintainSession)
+               saveSessionInfo(callProps, requestCtx);
 
             // At pivot the message context might be replaced
             msgContext = processPivotInternal(msgContext, direction);
@@ -484,9 +488,11 @@ public abstract class CommonClient implements StubExt, HeaderSource
 
    protected void addAttachmentParts(MessageAbstraction reqMessage)
    {
+      boolean debugEnabled = log.isDebugEnabled();
       for (AttachmentPart part : attachmentParts)
       {
-         log.debug("Adding attachment part: " + part.getContentId());
+         if (debugEnabled)
+            log.debug("Adding attachment part: " + part.getContentId());
          reqMessage.addAttachmentPart(part);
       }
    }

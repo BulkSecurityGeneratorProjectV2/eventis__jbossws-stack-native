@@ -43,7 +43,8 @@ public class DispatcherFactory implements ObjectFactory
       Reference ref = (Reference)object;
       String hostname = (String)ref.get(DispatcherDelegate.MANAGER_HOSTNAME).getContent();
 
-      Class cls = Thread.currentThread().getContextClassLoader().loadClass(ref.getClassName());
+      ClassLoader loader = SecurityActions.getContextClassLoader();
+      Class<?> cls = SecurityActions.loadClass(loader, ref.getClassName());
       DispatcherDelegate delegate = (DispatcherDelegate)cls.newInstance();
       delegate.setHostname(hostname);
       return delegate;

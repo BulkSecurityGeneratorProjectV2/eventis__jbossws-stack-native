@@ -25,8 +25,6 @@ import java.util.Map;
 
 import javax.xml.soap.MimeHeaders;
 
-import org.jboss.remoting.marshal.Marshaller;
-import org.jboss.remoting.marshal.UnMarshaller;
 import org.jboss.ws.core.MessageAbstraction;
 import org.jboss.ws.core.soap.FastInfosetMarshaller;
 import org.jboss.ws.core.soap.FastInfosetUnMarshaller;
@@ -53,10 +51,12 @@ public class FastInfosetConnectionHTTP extends SOAPProtocolConnectionHTTP
    @Override
    protected void populateHeaders(MessageAbstraction reqMessage, Map<String, Object> metadata)
    {
-      MimeHeaders mimeHeaders = reqMessage.getMimeHeaders();
-      mimeHeaders.setHeader(MimeConstants.CONTENT_TYPE, MimeConstants.TYPE_FASTINFOSET);
-      mimeHeaders.addHeader(MimeConstants.ACCEPT, MimeConstants.TYPE_FASTINFOSET);
-      
+      if (reqMessage != null)
+      {
+         MimeHeaders mimeHeaders = reqMessage.getMimeHeaders();
+         mimeHeaders.setHeader(MimeConstants.CONTENT_TYPE, MimeConstants.TYPE_FASTINFOSET);
+         mimeHeaders.addHeader(MimeConstants.ACCEPT, MimeConstants.TYPE_FASTINFOSET);
+      }
       super.populateHeaders(reqMessage, metadata);
    }
 }

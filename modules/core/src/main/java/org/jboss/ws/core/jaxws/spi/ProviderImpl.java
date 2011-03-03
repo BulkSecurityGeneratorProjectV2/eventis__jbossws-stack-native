@@ -35,10 +35,12 @@ import javax.xml.ws.Service;
 import javax.xml.ws.WebServiceException;
 import javax.xml.ws.WebServiceFeature;
 import javax.xml.ws.soap.SOAPBinding;
+import javax.xml.ws.spi.Invoker;
 import javax.xml.ws.spi.Provider;
 import javax.xml.ws.spi.ServiceDelegate;
 import javax.xml.ws.wsaddressing.W3CEndpointReference;
 
+import org.jboss.logging.Logger;
 import org.jboss.ws.core.jaxws.wsaddressing.EndpointReferenceUtil;
 import org.jboss.ws.core.jaxws.wsaddressing.NativeEndpointReference;
 import org.jboss.wsf.common.DOMUtils;
@@ -54,17 +56,17 @@ import org.w3c.dom.Element;
 public final class ProviderImpl extends Provider
 {
 
+   private static final Logger log = Logger.getLogger(ProviderImpl.class);
+
    public ProviderImpl()
    {
    }
 
-   @Override
    public Endpoint createAndPublishEndpoint(final String address, final Object implementor)
    {
       return this.createAndPublishEndpoint(address, implementor, (WebServiceFeature[])null);
    }
 
-   // @Override TODO: comment out override on switch to JAX-WS 2.2
    public Endpoint createAndPublishEndpoint(final String address, final Object implementor, final WebServiceFeature... features)
    {
       final String bindingId = getBindingFromAddress(address);
@@ -74,13 +76,11 @@ public final class ProviderImpl extends Provider
       return endpoint;
    }
 
-   @Override
    public Endpoint createEndpoint(final String bindingId, final Object implementor)
    {
       return this.createEndpoint(bindingId, implementor, (WebServiceFeature[])null);
    }
 
-   // @Override TODO: comment out override on switch to JAX-WS 2.2
    public Endpoint createEndpoint(final String bindingId, final Object implementor, final WebServiceFeature... features)
    {
       final String nonNullBindingId = this.getBindingId(bindingId, implementor.getClass());
@@ -88,48 +88,60 @@ public final class ProviderImpl extends Provider
       return new EndpointImpl(nonNullBindingId, implementor, features);
    }
 
-   /* TODO: comment out on switch to JAX-WS 2.2
-   @SuppressWarnings("unchecked")
-   @Override
-   public Endpoint createEndpoint(final String bindingId, final Class implementorClass, final Invoker invoker,
+   public Endpoint createEndpoint(final String bindingId, final Class<?> implementorClass, final Invoker invoker,
          final WebServiceFeature... features)
    {
-      throw new UnsupportedOperationException("This method is not portable across JAX-WS implementations");
+      // JAX-WS Endpoint API is broken by design and reveals many implementation details 
+      // of JAX-WS RI that are not portable cross different application servers :(
+      log.warn("createEndpoint(String,Class,Invoker,WebServiceFeature...) not implemented"); // TODO implement?
+
+      return null;
+   }
+   
+   /*
+   public ServiceDelegate createServiceDelegate(final URL wsdlLocation, final QName serviceName, final Class<? extends Service> serviceClass)
+   {
+      return this.createServiceDelegate(wsdlLocation, serviceName, serviceClass, (WebServiceFeature[])null);
    }
    */
-   
-   @Override
-   public ServiceDelegate createServiceDelegate(final URL wsdlLocation, final QName serviceName, final Class serviceClass)
+
+   @SuppressWarnings("unchecked")
+   public ServiceDelegate createServiceDelegate(final URL wsdlLocation, final QName serviceName, final Class serviceClass, 
+         final WebServiceFeature... features)
+   {
+      try
+      {
+         ServiceDelegateImpl delegate = new ServiceDelegateImpl(wsdlLocation, serviceName, serviceClass, features);
+         DOMUtils.clearThreadLocals();
+         return delegate;
+      }
+      catch (RuntimeException e)
+      {
+         throw new WebServiceException(e);
+      }
+   }
+
+   @SuppressWarnings("unchecked")
+   public ServiceDelegate createServiceDelegate(URL wsdlLocation, QName serviceName,
+         Class serviceClass)
    {
       return this.createServiceDelegate(wsdlLocation, serviceName, serviceClass, (WebServiceFeature[])null);
    }
 
-   // @Override TODO: comment out override on switch to JAX-WS 2.2
-   public ServiceDelegate createServiceDelegate(final URL wsdlLocation, final QName serviceName, final Class serviceClass,
-         final WebServiceFeature... features)
-   {
-      ServiceDelegateImpl delegate = new ServiceDelegateImpl(wsdlLocation, serviceName, serviceClass, features);
-      DOMUtils.clearThreadLocals();
-      return delegate;
-   }
-
-   // @Override TODO: comment out override on switch to JAX-WS 2.2
    public W3CEndpointReference createW3CEndpointReference(final String address, final QName interfaceName, 
          final QName serviceName, final QName portName, final List<Element> metadata, final String wsdlDocumentLocation, 
          final List<Element> referenceParameters, final List<Element> elements, final Map<QName, String> attributes)
    {
-      throw new UnsupportedOperationException(); // TODO
-   }
-
-   @Override
-   public W3CEndpointReference createW3CEndpointReference(final String address, final QName serviceName, 
-         final QName portName, final List<Element> metadata, final String wsdlDocumentLocation,
-         final List<Element> referenceParameters)
-   {
+      if ((serviceName == null) && (address == null) && (portName == null))
+         throw new IllegalStateException();
+      if ((portName != null) && (serviceName == null))
+         throw new IllegalStateException();
+      
       final NativeEndpointReference epr = new NativeEndpointReference();
       epr.setAddress(address);
       epr.setServiceName(serviceName);
       epr.setEndpointName(portName);
+      epr.setInterfaceName(interfaceName);
       epr.setMetadata(metadata);
       epr.setWsdlLocation(wsdlDocumentLocation);
       epr.setReferenceParameters(referenceParameters);
@@ -137,7 +149,13 @@ public final class ProviderImpl extends Provider
       return EndpointReferenceUtil.transform(W3CEndpointReference.class, epr);
    }
 
-   @Override
+   public W3CEndpointReference createW3CEndpointReference(final String address, final QName serviceName, 
+         final QName portName, final List<Element> metadata, final String wsdlDocumentLocation,
+         final List<Element> referenceParameters)
+   {
+      return createW3CEndpointReference(address, null, serviceName, portName, metadata, wsdlDocumentLocation, referenceParameters, null, null);
+   }
+
    public <T> T getPort(final EndpointReference epr, final Class<T> sei, final WebServiceFeature... features)
    {
       final NativeEndpointReference nepr = EndpointReferenceUtil.transform(NativeEndpointReference.class, epr);
@@ -148,7 +166,6 @@ public final class ProviderImpl extends Provider
       return delegate.getPort(epr, sei, features);
    }
 
-   @Override
    public EndpointReference readEndpointReference(final Source eprInfoset)
    {
       if (eprInfoset == null)
@@ -156,8 +173,9 @@ public final class ProviderImpl extends Provider
 
       try
       {
-         //we currently support W3CEndpointReference only
-         return new W3CEndpointReference(eprInfoset);
+         final NativeEndpointReference nativeEPR = new NativeEndpointReference(eprInfoset);
+         final Source source = EndpointReferenceUtil.getSourceFromEndpointReference(nativeEPR);
+         return new W3CEndpointReference(source);
       }
       catch (Exception e)
       {

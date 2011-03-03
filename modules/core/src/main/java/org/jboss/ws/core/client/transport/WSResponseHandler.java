@@ -29,14 +29,17 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import javax.servlet.http.HttpServletResponse;
+
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBufferInputStream;
 import org.jboss.netty.channel.ChannelHandlerContext;
-import org.jboss.netty.channel.ChannelPipelineCoverage;
+import org.jboss.netty.channel.ChannelHandler.Sharable;
 import org.jboss.netty.channel.ExceptionEvent;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 import org.jboss.netty.handler.codec.http.HttpResponse;
+import org.jboss.netty.handler.codec.http.HttpResponseStatus;
 
 /**
  * A Netty channel upstream handler that receives MessageEvent
@@ -44,9 +47,8 @@ import org.jboss.netty.handler.codec.http.HttpResponse;
  * 
  * @author alessio.soldano@jboss.com
  * @since 24-Jun-2009
- *
  */
-@ChannelPipelineCoverage("one")
+@Sharable
 public class WSResponseHandler extends SimpleChannelUpstreamHandler
 {
    private FutureResult future;
@@ -65,16 +67,21 @@ public class WSResponseHandler extends SimpleChannelUpstreamHandler
          return;
       }
       future.start();
-      ResultImpl result = new ResultImpl();
-      future.setResult(result);
       try
       {
          HttpResponse response = (HttpResponse)e.getMessage();
-
+         HttpResponseStatus responseStatus = response.getStatus();
+         if (HttpServletResponse.SC_CONTINUE == responseStatus.getCode())
+         {
+        	 //[JBWS-2947] Even if we do not send any Expect request-header, we should not fail on HTTP 100 replies, so we just go on to the following message ignoring them
+        	 return;
+         }
+         ResultImpl result = new ResultImpl();
+         Map<String, Object> metadata = result.getMetadata();
+         metadata.put(NettyClient.PROTOCOL, response.getProtocolVersion());
+         metadata.put(NettyClient.RESPONSE_CODE, responseStatus.getCode());
+         metadata.put(NettyClient.RESPONSE_CODE_MESSAGE, responseStatus.getReasonPhrase());
          Map<String, Object> responseHeaders = result.getResponseHeaders();
-         responseHeaders.put(NettyClient.PROTOCOL, response.getProtocolVersion());
-         responseHeaders.put(NettyClient.RESPONSE_CODE, response.getStatus().getCode());
-         responseHeaders.put(NettyClient.RESPONSE_CODE_MESSAGE, response.getStatus().getReasonPhrase());
          for (String headerName : response.getHeaderNames())
          {
             responseHeaders.put(headerName, response.getHeaders(headerName));
@@ -82,13 +89,12 @@ public class WSResponseHandler extends SimpleChannelUpstreamHandler
 
          ChannelBuffer content = response.getContent();
          result.setResponse(new ChannelBufferInputStream(content));
+         future.setResult(result);
+         future.done();
       }
       catch (Throwable t)
       {
          future.setException(t);
-      }
-      finally
-      {
          future.done();
       }
    }
@@ -110,13 +116,13 @@ public class WSResponseHandler extends SimpleChannelUpstreamHandler
       return future;
    }
    
-   private class FutureResult implements Future<Result>
+   private static class FutureResult implements Future<Result>
    {
-      protected Result result;
-      protected Throwable exception;
-      protected boolean done = false;
-      protected boolean cancelled = false;
-      protected boolean started = false;
+      private volatile Result result;
+      private volatile Throwable exception;
+      private volatile boolean done = false;
+      private volatile boolean cancelled = false;
+      private volatile boolean started = false;
 
       public FutureResult()
       {
@@ -220,12 +226,15 @@ public class WSResponseHandler extends SimpleChannelUpstreamHandler
       public InputStream getResponse();
       
       public Map<String, Object> getResponseHeaders();
+      
+      public Map<String, Object> getMetadata();
    }
    
-   private class ResultImpl implements Result
+   private static class ResultImpl implements Result
    {
       private InputStream is;
       private Map<String, Object> responseHeaders = new HashMap<String, Object>();
+      private Map<String, Object> metadata = new HashMap<String, Object>();
       
       public InputStream getResponse()
       {
@@ -242,6 +251,10 @@ public class WSResponseHandler extends SimpleChannelUpstreamHandler
       public void setResponseHeaders(Map<String, Object> responseHeaders)
       {
          this.responseHeaders = responseHeaders;
+      }
+      public Map<String, Object> getMetadata()
+      {
+         return metadata;
       }
    }
 }

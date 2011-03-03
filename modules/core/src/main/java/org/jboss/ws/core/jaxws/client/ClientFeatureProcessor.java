@@ -42,6 +42,7 @@ import org.jboss.ws.feature.FastInfosetFeature;
 import org.jboss.ws.feature.JsonEncodingFeature;
 import org.jboss.ws.feature.SchemaValidationFeature;
 import org.jboss.ws.metadata.umdm.EndpointMetaData;
+import org.jboss.ws.metadata.umdm.FeatureAwareEndpointMetaData;
 import org.jboss.ws.metadata.umdm.FeatureSet;
 import org.jboss.ws.metadata.umdm.ServiceMetaData;
 import org.jboss.ws.metadata.wsdl.Extendable;
@@ -86,7 +87,10 @@ public class ClientFeatureProcessor
       processMTOMFeature(feature, epMetaData, stub);
       processRespectBindingFeature(feature, epMetaData, stub);
       processChunkedEncodingFeature(feature, epMetaData, stub);
-      epMetaData.addFeature(feature);
+
+      // overriding feature for this stub
+      FeatureAwareEndpointMetaData featureOverridableMetaData = (FeatureAwareEndpointMetaData)stub;
+      featureOverridableMetaData.setFeature(feature);
    }
    
    /**
@@ -101,13 +105,40 @@ public class ClientFeatureProcessor
    @SuppressWarnings("unchecked")
    private static <T> void processAddressingFeature(WebServiceFeature feature, EndpointMetaData epMetaData, T stub)
    {
-      if (feature instanceof AddressingFeature && feature.isEnabled())
+      if (feature instanceof AddressingFeature)
       {
-         BindingExt bindingExt = (BindingExt)((BindingProvider)stub).getBinding();
+         BindingExt bindingExt = (BindingExt) ((BindingProvider) stub).getBinding();
          List<Handler> handlers = bindingExt.getHandlerChain(HandlerType.POST);
-         handlers.add(new WSAddressingClientHandler());
-         bindingExt.setHandlerChain(handlers, HandlerType.POST);
+         int addressingHandlerIndex = getAddressingHandlerIndex(handlers);
+
+         if (feature.isEnabled())
+         {
+            if (addressingHandlerIndex == -1)
+            {
+               handlers.add(new WSAddressingClientHandler());
+               bindingExt.setHandlerChain(handlers, HandlerType.POST);
+            }
+         }
+         else if (addressingHandlerIndex != -1)
+         {
+            handlers.remove(addressingHandlerIndex);
+            bindingExt.setHandlerChain(handlers, HandlerType.POST);
+         }
       }
+   }
+   
+   private static int getAddressingHandlerIndex(final List<Handler> handlers)
+   {
+      if (handlers != null)
+      {
+         for (int i = 0; i < handlers.size(); i++)
+         {
+            if (handlers.get(i) instanceof WSAddressingClientHandler)
+               return i;
+         }
+      }
+      
+      return -1;
    }
    
    /**

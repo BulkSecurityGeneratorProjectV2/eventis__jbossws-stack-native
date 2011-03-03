@@ -49,11 +49,11 @@ import org.jboss.wsf.spi.annotation.WebContext;
    style = SOAPBinding.Style.DOCUMENT,
    parameterStyle = SOAPBinding.ParameterStyle.WRAPPED
 )
-public final class MyWebServiceBean
+public class MyWebServiceBean
 {
     @WebMethod
     @PermitAll
-    public final String doStuff()
+    public String doStuff()
     {
         return "i've done stuff";
     }

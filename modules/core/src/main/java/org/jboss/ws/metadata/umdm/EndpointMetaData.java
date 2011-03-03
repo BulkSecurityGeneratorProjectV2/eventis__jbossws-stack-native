@@ -40,6 +40,7 @@ import java.util.Set;
 
 import javax.jws.soap.SOAPBinding.ParameterStyle;
 import javax.xml.bind.JAXBContext;
+import javax.xml.bind.annotation.XmlElementDecl;
 import javax.xml.namespace.QName;
 import javax.xml.rpc.ParameterMode;
 import javax.xml.ws.WebServiceFeature;
@@ -60,6 +61,7 @@ import org.jboss.ws.core.jaxws.JAXBContextFactory;
 import org.jboss.ws.core.jaxws.JAXBDeserializerFactory;
 import org.jboss.ws.core.jaxws.JAXBSerializerFactory;
 import org.jboss.ws.core.jaxws.client.DispatchBinding;
+import org.jboss.ws.core.jaxws.wsaddressing.NativeEndpointReference;
 import org.jboss.ws.core.soap.Style;
 import org.jboss.ws.core.soap.Use;
 import org.jboss.ws.extensions.wsrm.config.RMConfig;
@@ -74,6 +76,7 @@ import org.jboss.ws.metadata.config.EndpointFeature;
 import org.jboss.ws.metadata.config.JBossWSConfigFactory;
 import org.jboss.wsf.common.JavaUtils;
 import org.jboss.wsf.spi.binding.BindingCustomization;
+import org.jboss.wsf.spi.binding.JAXBBindingCustomization;
 import org.jboss.wsf.spi.deployment.UnifiedVirtualFile;
 import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedPortComponentRefMetaData;
 import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedHandlerMetaData.HandlerType;
@@ -145,6 +148,8 @@ public abstract class EndpointMetaData extends ExtensibleMetaData implements Con
    private FeatureSet features = new FeatureSet();
    // The documentation edfined through the @Documentation annotation
    private String documentation;
+   
+   private NativeEndpointReference epr;
 
    private ConfigObservable configObservable = new ConfigObservable();
 
@@ -153,6 +158,10 @@ public abstract class EndpointMetaData extends ExtensibleMetaData implements Con
    private JAXBContextCache jaxbCache = new JAXBContextCache();
 
    private List<BindingCustomization> bindingCustomization = new ArrayList<BindingCustomization>();
+   
+   EndpointMetaData()
+   {
+   }
 
    public EndpointMetaData(ServiceMetaData service, QName portName, QName portTypeName, Type type)
    {
@@ -178,6 +187,16 @@ public abstract class EndpointMetaData extends ExtensibleMetaData implements Con
    public void setPortName(QName portName)
    {
       this.portName = portName;
+   }
+
+   public NativeEndpointReference getEndpointReference()
+   {
+      return epr;
+   }
+
+   public void setEndpointReference(final NativeEndpointReference epr)
+   {
+      this.epr = epr;
    }
 
    public QName getPortTypeName()
@@ -216,7 +235,7 @@ public abstract class EndpointMetaData extends ExtensibleMetaData implements Con
       if (wsMetaData.isEagerInitialized())
       {
          if (UnifiedMetaData.isFinalRelease() == false)
-            log.warn("Set SEI name after eager initialization", new IllegalStateException());
+            log.warn("Set SEI name after eager initialization");
 
          // reinitialize
          initializeInternal();
@@ -699,6 +718,28 @@ public abstract class EndpointMetaData extends ExtensibleMetaData implements Con
          try
          {
             Class[] classes = getRegisteredTypes().toArray(new Class[0]);
+            String defaultNS = portTypeName.getNamespaceURI();
+            for (Class<?> clz : classes)
+            {
+               if (clz.getName().endsWith("ObjectFactory"))
+               {
+                  for (Method method : clz.getMethods())
+                  {
+                     XmlElementDecl elementDecl = method.getAnnotation(XmlElementDecl.class);
+                     if (elementDecl != null && XmlElementDecl.GLOBAL.class.equals(elementDecl.scope())
+                           && elementDecl.namespace() != null && elementDecl.namespace().length() > 0)
+                     {
+                        defaultNS = null;
+                     }
+                  }
+               }
+            }
+            if (defaultNS != null)
+            {
+               if (bindingCustomization == null)
+                  bindingCustomization = new JAXBBindingCustomization();
+               bindingCustomization.put("com.sun.xml.bind.defaultNamespaceRemap", defaultNS);
+            }
             JAXBContext context = JAXBContextFactory.newInstance().createContext(classes, bindingCustomization);
             jaxbCache.add(classes, context);
          }

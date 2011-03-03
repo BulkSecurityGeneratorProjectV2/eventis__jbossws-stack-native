@@ -21,7 +21,7 @@
  */
 package org.jboss.ws.extensions.wsrm.transport.backchannel;
 
-import java.net.URL;
+import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -77,8 +77,9 @@ public final class RMRequestHandlerImpl extends AbstractNettyRequestHandler
       boolean error = false;
       try
       {
-         String requestPath = new URL(request.getUri()).getPath();
-         RMMessage message = (RMMessage)RMUnMarshaller.getInstance().read(content.readable() ? new ChannelBufferInputStream(content) : null, requestHeaders);
+    	 URI requestURI = URI.create(request.getUri());
+    	 String requestPath = requestURI.getRawPath();
+         RMMessage message = (RMMessage)RMUnMarshaller.getInstance().read(content.readable() ? new ChannelBufferInputStream(content) : null, null, requestHeaders);
          handle(requestPath, message);
       }
       catch (Throwable t)

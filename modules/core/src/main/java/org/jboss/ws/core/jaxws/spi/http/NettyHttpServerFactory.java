@@ -21,15 +21,12 @@
  */
 package org.jboss.ws.core.jaxws.spi.http;
 
-import org.jboss.wsf.spi.http.HttpServer;
-import org.jboss.wsf.spi.http.HttpServerFactory;
-
 /**
- * @see org.jboss.wsf.spi.http.HttpServerFactory 
+ * Netty server factory. 
  *
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
-public final class NettyHttpServerFactory extends HttpServerFactory
+public final class NettyHttpServerFactory
 {
 
    /** Netty HTTP server adapter singleton. */
@@ -38,7 +35,7 @@ public final class NettyHttpServerFactory extends HttpServerFactory
    /**
     * Constructor.
     */
-   public NettyHttpServerFactory()
+   private NettyHttpServerFactory()
    {
       super();
    }
@@ -48,8 +45,7 @@ public final class NettyHttpServerFactory extends HttpServerFactory
     * 
     * @return Netty based http server adapter
     */
-   @Override
-   public HttpServer getHttpServer()
+   public static HttpServer getHttpServer()
    {
       return NettyHttpServerFactory.NETTY_SERVER_ADAPTER_SINGLETON;
    }

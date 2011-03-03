@@ -41,7 +41,6 @@ import javax.jms.QueueSender;
 import javax.jms.QueueSession;
 import javax.jms.Session;
 import javax.jms.TextMessage;
-import javax.jms.Topic;
 import javax.management.ObjectName;
 import javax.naming.InitialContext;
 import javax.xml.soap.SOAPException;
@@ -57,17 +56,19 @@ import org.jboss.wsf.spi.invocation.InvocationContext;
 import org.jboss.wsf.spi.invocation.RequestHandler;
 import org.jboss.wsf.spi.management.EndpointRegistry;
 import org.jboss.wsf.spi.management.EndpointRegistryFactory;
+import org.jboss.wsf.spi.management.JMSEndpointResolver;
 
 /**
  * The abstract base class for MDBs that want to act as web service endpoints.
  * A subclass should only need to implement the service endpoint interface.
  *
  * @author Thomas.Diesler@jboss.org
+ * @author alessio.soldano@jboss.com
  */
 public abstract class AbstractJMSTransportSupport implements MessageListener
 {
    // logging support
-   protected Logger log = Logger.getLogger(AbstractJMSTransportSupport.class);
+   protected static Logger log = Logger.getLogger(AbstractJMSTransportSupport.class);
 
    private QueueConnectionFactory conFactory;
    
@@ -96,16 +97,9 @@ public abstract class AbstractJMSTransportSupport implements MessageListener
          if (log.isDebugEnabled())
             log.debug("Incomming SOAP message: " + msgStr);
 
-         String fromName = null;
-         Destination destination = message.getJMSDestination();
-         if (destination instanceof Queue)
-            fromName = "queue/" + ((Queue)destination).getQueueName();
-         if (destination instanceof Topic)
-            fromName = "topic/" + ((Topic)destination).getTopicName();
-
          InputStream inputStream = new ByteArrayInputStream(msgStr.getBytes());
          ByteArrayOutputStream outputStream = new ByteArrayOutputStream(1024);
-         processSOAPMessage(fromName, inputStream, outputStream);
+         processSOAPMessage(message.getJMSDestination(), inputStream, outputStream);
 
          msgStr = new String(outputStream.toByteArray());
          if (log.isDebugEnabled())
@@ -137,16 +131,18 @@ public abstract class AbstractJMSTransportSupport implements MessageListener
          throw new EJBException(e);
       }
    }
-
-   protected void processSOAPMessage(String fromName, InputStream inputStream, OutputStream outStream) throws SOAPException, IOException, RemoteException
+   
+   protected void processSOAPMessage(Destination destination, InputStream inputStream, OutputStream outStream) throws SOAPException, IOException, RemoteException
    {
       SPIProvider spiProvider = SPIProviderResolver.getInstance().getProvider();
       EndpointRegistry epRegistry = spiProvider.getSPI(EndpointRegistryFactory.class).getEndpointRegistry();
 
-      Endpoint endpoint = getEndpointForDestination(epRegistry, fromName);
+      JMSEndpointResolver resolver = spiProvider.getSPI(JMSEndpointResolver.class);
+      resolver.setDestination(destination);
+      Endpoint endpoint = epRegistry.resolve(resolver);
 
       if (endpoint == null)
-         throw new IllegalStateException("Cannot find endpoint for: " + fromName);
+         throw new IllegalStateException("Cannot find endpoint for destination: " + destination);
 
       EndpointAssociation.setEndpoint(endpoint);
       try
@@ -194,23 +190,6 @@ public abstract class AbstractJMSTransportSupport implements MessageListener
       {
          EndpointAssociation.removeEndpoint();
       }
-   }
-
-   // The destination jndiName is encoded in the service object name under key 'jms'
-   private Endpoint getEndpointForDestination(EndpointRegistry epRegistry, String fromName)
-   {
-      Endpoint endpoint = null;
-      for (ObjectName oname : epRegistry.getEndpoints())
-      {
-         Endpoint aux = epRegistry.getEndpoint(oname);
-         String jmsProp = aux.getName().getKeyProperty("jms");
-         if (jmsProp != null && jmsProp.equals(fromName))
-         {
-            endpoint = aux;
-            break;
-         }
-      }
-      return endpoint;
    }
 
    private String getMessageStr(BytesMessage message) throws Exception

@@ -129,6 +129,15 @@ public abstract class AbstractNettyMessage extends DefaultHttpMessage implements
    }
 
    /**
+    * Sets response status code.
+    * @param sc response status code
+    */
+   public final void setStatus(final HttpResponseStatus sc)
+   {
+      this.status = sc;
+   }
+
+   /**
     * Sets cookis to response.
     */
    public final void setCookies()

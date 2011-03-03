@@ -21,7 +21,9 @@
  */
 package org.jboss.ws.core.jaxws.client;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +31,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
 import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBElement;
 import javax.xml.namespace.QName;
 import javax.xml.soap.MimeHeaders;
 import javax.xml.soap.SOAPException;
@@ -36,6 +39,9 @@ import javax.xml.soap.SOAPFactory;
 import javax.xml.soap.SOAPFault;
 import javax.xml.soap.SOAPMessage;
 import javax.xml.transform.Source;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.sax.SAXSource;
+import javax.xml.transform.stream.StreamSource;
 import javax.xml.ws.AsyncHandler;
 import javax.xml.ws.Binding;
 import javax.xml.ws.BindingProvider;
@@ -43,6 +49,7 @@ import javax.xml.ws.Dispatch;
 import javax.xml.ws.EndpointReference;
 import javax.xml.ws.Response;
 import javax.xml.ws.WebServiceException;
+import javax.xml.ws.WebServiceFeature;
 import javax.xml.ws.Service.Mode;
 import javax.xml.ws.handler.Handler;
 import javax.xml.ws.handler.MessageContext;
@@ -55,6 +62,7 @@ import org.jboss.util.NotImplementedException;
 import org.jboss.ws.WSException;
 import org.jboss.ws.core.CommonMessageContext;
 import org.jboss.ws.core.ConfigProvider;
+import org.jboss.ws.core.EndpointMetadataProvider;
 import org.jboss.ws.core.MessageAbstraction;
 import org.jboss.ws.core.client.EndpointInfo;
 import org.jboss.ws.core.client.HTTPProtocolConnection;
@@ -73,12 +81,18 @@ import org.jboss.ws.metadata.config.ConfigurationProvider;
 import org.jboss.ws.metadata.umdm.ClientEndpointMetaData;
 import org.jboss.ws.metadata.umdm.EndpointConfigMetaData;
 import org.jboss.ws.metadata.umdm.EndpointMetaData;
+import org.jboss.ws.metadata.umdm.FeatureAwareClientEndpointMetaDataAdapter;
+import org.jboss.ws.metadata.umdm.FeatureAwareEndpointMetaData;
 import org.jboss.ws.metadata.umdm.OperationMetaData;
 import org.jboss.ws.metadata.umdm.ServiceMetaData;
 import org.jboss.ws.metadata.wsse.WSSecurityConfigFactory;
 import org.jboss.ws.metadata.wsse.WSSecurityConfiguration;
+import org.jboss.wsf.common.DOMUtils;
 import org.jboss.wsf.spi.deployment.UnifiedVirtualFile;
 import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedHandlerMetaData.HandlerType;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.xml.sax.InputSource;
 
 
 /**
@@ -88,14 +102,14 @@ import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedHandlerMetaData.Handler
  * @author Thomas.Diesler@jboss.com
  * @since 04-Jul-2006
  */
-public class DispatchImpl<T> implements Dispatch<T>, ConfigProvider
+public class DispatchImpl<T> implements Dispatch<T>, ConfigProvider, EndpointMetadataProvider, FeatureAwareEndpointMetaData
 {
    // provide logging
    private final Logger log = Logger.getLogger(DispatchImpl.class);
 
    private BindingProvider bindingProvider;
    private HandlerResolverImpl handlerResolver;
-   private ClientEndpointMetaData epMetaData;
+   private FeatureAwareClientEndpointMetaDataAdapter epMetaData;
    private JAXBContext jaxbContext;
    private ExecutorService executor;
    private String securityConfig;
@@ -107,7 +121,7 @@ public class DispatchImpl<T> implements Dispatch<T>, ConfigProvider
    public DispatchImpl(ExecutorService executor, EndpointMetaData epMetaData, Class<T> type, Mode mode)
    {
       this.bindingProvider = new BindingProviderImpl(epMetaData);
-      this.epMetaData = (ClientEndpointMetaData)epMetaData;
+      this.epMetaData = (FeatureAwareClientEndpointMetaDataAdapter)epMetaData;
       this.executor = executor;
       this.type = type;
       this.mode = mode;
@@ -117,7 +131,7 @@ public class DispatchImpl<T> implements Dispatch<T>, ConfigProvider
    public DispatchImpl(ExecutorService executor, EndpointMetaData epMetaData, JAXBContext jbc, Mode mode)
    {
       this.bindingProvider = new BindingProviderImpl(epMetaData);
-      this.epMetaData = (ClientEndpointMetaData)epMetaData;
+      this.epMetaData = (FeatureAwareClientEndpointMetaDataAdapter)epMetaData;
       this.executor = executor;
       this.type = Object.class;
       this.jaxbContext = jbc;
@@ -156,17 +170,13 @@ public class DispatchImpl<T> implements Dispatch<T>, ConfigProvider
             handlerResolver.initHandlerChain(ecmd, HandlerType.PRE, true);
             handlerResolver.initHandlerChain(ecmd, HandlerType.ENDPOINT, true);
             handlerResolver.initHandlerChain(ecmd, HandlerType.POST, true);
-            
+
             PortInfo portInfo = epMetaData.getPortInfo();
-            List<Handler> preChain = handlerResolver.getHandlerChain(portInfo, HandlerType.PRE);
-            List<Handler> epChain = handlerResolver.getHandlerChain(portInfo, HandlerType.ENDPOINT);
-            List<Handler> postChain = handlerResolver.getHandlerChain(portInfo, HandlerType.POST);
-            
-            binding.setHandlerChain(preChain, HandlerType.PRE);
-            binding.setHandlerChain(epChain, HandlerType.ENDPOINT);
-            binding.setHandlerChain(postChain, HandlerType.POST);
+            this.appendHandlers(HandlerType.PRE, portInfo, binding);
+            this.appendHandlers(HandlerType.ENDPOINT, portInfo, binding);
+            this.appendHandlers(HandlerType.POST, portInfo, binding);
          }
-         
+
          retObj = invokeInternalSOAP(obj);
       }
       else
@@ -174,6 +184,21 @@ public class DispatchImpl<T> implements Dispatch<T>, ConfigProvider
          retObj = invokeInternalNonSOAP(obj);
       }
       return retObj;
+   }
+   
+   private void appendHandlers(final HandlerType handlerType, final PortInfo portInfo, final BindingExt binding)
+   {
+      final List<Handler> resolverHandlerChain = this.handlerResolver.getHandlerChain(portInfo, handlerType);
+      final List<Handler> bindingHandlerChain = binding.getHandlerChain(handlerType);
+      
+      if (bindingHandlerChain == null || bindingHandlerChain.size() == 0)
+      {
+         binding.setHandlerChain(resolverHandlerChain, handlerType);
+      }
+      else
+      {
+         bindingHandlerChain.addAll(resolverHandlerChain);
+      }
    }
 
    private Object invokeInternalSOAP(Object obj) throws Exception
@@ -190,16 +215,15 @@ public class DispatchImpl<T> implements Dispatch<T>, ConfigProvider
       // R2745 A HTTP request MESSAGE MUST contain a SOAPAction HTTP header field
       // with a quoted empty string value, if in the corresponding WSDL description,
       // the soapAction attribute of soapbind:operation is either not present, or
-      // present with an empty string as its value.
-      String soapAction = null;
+      // present with an empty string as its value.      
       Map<String, Object> reqContext = getRequestContext();
-      Boolean useSOAPAction = (Boolean)reqContext.get(BindingProvider.SOAPACTION_USE_PROPERTY);
-      if (Boolean.TRUE.equals(useSOAPAction))
+      String soapAction = (String) reqContext.get(BindingProvider.SOAPACTION_URI_PROPERTY);;
+      Boolean useSOAPAction = (Boolean) reqContext.get(BindingProvider.SOAPACTION_USE_PROPERTY);
+      if (Boolean.TRUE.equals(useSOAPAction) && soapAction == null)
       {
-         soapAction = (String)reqContext.get(BindingProvider.SOAPACTION_URI_PROPERTY);
-         if (soapAction == null)
             throw new IllegalStateException("Cannot obtain: " + BindingProvider.SOAPACTION_URI_PROPERTY);
       }
+      
       MimeHeaders mimeHeaders = reqMsg.getMimeHeaders();
       mimeHeaders.addHeader("SOAPAction", soapAction != null ? soapAction : "");
 
@@ -261,7 +285,7 @@ public class DispatchImpl<T> implements Dispatch<T>, ConfigProvider
 
             if (handlerPass)
             {
-               retObj = getReturnObject(resMsg);
+               retObj = getReturnObject(resMsg, obj);
             }
          }
          catch (Exception ex)
@@ -299,7 +323,7 @@ public class DispatchImpl<T> implements Dispatch<T>, ConfigProvider
          targetAddress = (String) callProps.get(BindingProvider.ENDPOINT_ADDRESS_PROPERTY);
       }
       MessageAbstraction resMsg = getRemotingConnection().invoke(reqMsg, targetAddress, false);
-      Object retObj = getReturnObject(resMsg);
+      Object retObj = getReturnObject(resMsg, obj);
       return retObj;
    }
 
@@ -452,24 +476,39 @@ public class DispatchImpl<T> implements Dispatch<T>, ConfigProvider
       return message;
    }
 
-   private Object getReturnObject(MessageAbstraction resMsg)
+   private Object getReturnObject(MessageAbstraction resMsg, Object reqObj)
    {
       String bindingID = bindingProvider.getBinding().getBindingID();
       if (EndpointMetaData.SUPPORTED_BINDINGS.contains(bindingID) == false)
          throw new IllegalStateException("Unsupported binding: " + bindingID);
 
-      Object retObj = null;
+      boolean unwrap = !(reqObj instanceof JAXBElement);
+      Object resObj = null;
       if (HTTPBinding.HTTP_BINDING.equals(bindingID))
       {
          DispatchHTTPBinding helper = new DispatchHTTPBinding(mode, type, jaxbContext);
-         retObj = helper.getReturnObject(resMsg);
+         resObj = helper.getReturnObject(resMsg);
       }
       else
       {
          DispatchSOAPBinding helper = new DispatchSOAPBinding(mode, type, jaxbContext);
-         retObj = helper.getReturnObject(resMsg);
+         resObj = helper.getReturnObject(resMsg, unwrap);
       }
-      return retObj;
+      
+      // HACK - handle null because of TCK requirement
+      if ((reqObj instanceof Source) && (resObj instanceof DOMSource))
+      {
+         resObj = this.handleNull((DOMSource)resObj);
+      }
+      
+      return resObj;
+   }
+   
+   private Source handleNull(final DOMSource from)
+   {
+      final Node node = from.getNode();
+      
+      return node != null ? from : null;
    }
 
    class AsyncRunnable implements Runnable
@@ -639,4 +678,26 @@ public class DispatchImpl<T> implements Dispatch<T>, ConfigProvider
          log.debug("Cannot find the right operation metadata!");
       return opMetaData;
    }
+
+   public EndpointMetaData getEndpointMetaData()
+   {
+      return epMetaData;
+   }
+
+   //////////////////////////////////////////
+   // FeatureAwareEndpointMetaData support //
+   //////////////////////////////////////////
+   
+   @Override
+   public <T extends WebServiceFeature> T getFeature(Class<T> key)
+   {
+      return this.epMetaData.getFeature(key);
+   }
+
+   @Override
+   public void setFeature(WebServiceFeature feature)
+   {
+      this.epMetaData.setFeature(feature);
+   }
+
 }

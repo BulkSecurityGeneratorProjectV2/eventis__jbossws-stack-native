@@ -46,9 +46,9 @@ import org.jboss.ws.core.jaxws.wsaddressing.EndpointReferenceUtil;
 import org.jboss.wsf.spi.SPIProvider;
 import org.jboss.wsf.spi.SPIProviderResolver;
 import org.jboss.wsf.spi.deployment.Deployment;
-import org.jboss.wsf.spi.http.HttpContext;
-import org.jboss.wsf.spi.http.HttpServer;
-import org.jboss.wsf.spi.http.HttpServerFactory;
+import org.jboss.ws.core.jaxws.spi.http.HttpContext;
+import org.jboss.ws.core.jaxws.spi.http.HttpServer;
+import org.jboss.ws.core.jaxws.spi.http.NettyHttpServerFactory;
 import org.jboss.wsf.spi.management.ServerConfig;
 import org.jboss.wsf.spi.management.ServerConfigFactory;
 import org.w3c.dom.Element;
@@ -126,11 +126,8 @@ public class EndpointImpl extends Endpoint
       this.checkPublishEndpointPermission();
 
       // Get HTTP server
-      final SPIProvider spiProvider = SPIProviderResolver.getInstance().getProvider();
-      final HttpServer httpServer = spiProvider.getSPI(HttpServerFactory.class).getHttpServer();
-
-      final String contextRoot = this.getContextRoot();
-      final HttpContext context = httpServer.createContext(contextRoot);
+      final HttpServer httpServer = NettyHttpServerFactory.getHttpServer();
+      final HttpContext context = httpServer.createContext(this.getContextRoot());
 
       this.publish(context);
    }
@@ -148,7 +145,8 @@ public class EndpointImpl extends Endpoint
       if (context == null)
          throw new IllegalArgumentException("Null context");
       
-      log.debug("publishing endpoint " + this + " to " + context);
+      if (log.isDebugEnabled())
+         log.debug("publishing endpoint " + this + " to " + context);
 
       if (isDestroyed)
          throw new IllegalStateException("Endpoint already destroyed");
@@ -365,4 +363,18 @@ public class EndpointImpl extends Endpoint
       return this.dep;
    }
    
+   public void publish(final javax.xml.ws.spi.http.HttpContext serverContext)
+   {
+      // JAX-WS Endpoint API is broken by design and reveals many implementation details 
+      // of JAX-WS RI that are not portable cross different application servers :(
+      log.warn("publish(javax.xml.ws.spi.http.HttpContext) not implemented"); // TODO implement?
+   }
+
+   public void setEndpointContext(final javax.xml.ws.EndpointContext endpointContext)
+   {
+      // JAX-WS Endpoint API is broken by design and reveals many implementation details 
+      // of JAX-WS RI that are not portable cross different application servers :(
+      log.warn("setEndpointContext(javax.xml.ws.EndpointContext) not implemented"); // TODO implement?
+   }
+
 }

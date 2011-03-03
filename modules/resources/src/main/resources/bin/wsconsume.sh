@@ -1,7 +1,19 @@
 #!/bin/sh
 
-DIRNAME=`dirname $0`
-PROGNAME=`basename $0`
+# Extract the directory and the program name
+# takes care of symlinks
+PRG="$0"
+while [ -h "$PRG" ] ; do
+  ls=`ls -ld "$PRG"`
+  link=`expr "$ls" : '.*-> \(.*\)$'`
+  if expr "$link" : '/.*' > /dev/null; then
+    PRG="$link"
+  else
+    PRG="`dirname "$PRG"`/$link"
+  fi
+done
+DIRNAME=`dirname "$PRG"`
+PROGNAME=`basename "$PRG"`
 
 # OS specific support (must be 'true' or 'false').
 cygwin=false;
@@ -57,13 +69,14 @@ WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/wstx-lgpl.jar"
 WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/jbossall-client.jar"
 WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/log4j.jar"
 WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/mail.jar"
+WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/jbossws-api.jar"
 WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/jbossws-spi.jar"
 WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/jbossws-common.jar"
-WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/jbossws-framework.jar"
 
 # Shared jaxws libs
 WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/jaxws-tools.jar"
 WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/jaxws-rt.jar"
+WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/policy.jar"
 WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/stax-api.jar"
 WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/jaxb-api.jar"
 WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/jaxb-impl.jar"
@@ -76,12 +89,14 @@ WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/jsr181-api.jar"
 # Stack specific dependencies
 WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/javassist.jar"
 WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/jboss-xml-binding.jar"
+WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/resolver.jar"
+WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/xercesImpl.jar"
+WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/jbossxb.jar"
 WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/jbossws-native-client.jar"
 WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/jbossws-native-core.jar"
-WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/jbossws-native-jaxws.jar"
-WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/jbossws-native-jaxws-ext.jar"
-WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/jbossws-native-jaxrpc.jar"
-WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/jbossws-native-saaj.jar"
+WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/jbossws-native-services.jar"
+WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/jaxrpc-api.jar"
+WSCONSUME_CLASSPATH="$WSCONSUME_CLASSPATH:$JBOSS_HOME/client/saaj-api.jar"
 
 ###
 # Execute the JVM
@@ -97,6 +112,7 @@ fi
 
 # Execute the command
 "$JAVA" $JAVA_OPTS \
+   -Dlog4j.configuration=log4j.xml \
    -Djava.endorsed.dirs="$JBOSS_ENDORSED_DIRS" \
    -classpath "$WSCONSUME_CLASSPATH" \
    org.jboss.wsf.spi.tools.cmd.WSConsume "$@"

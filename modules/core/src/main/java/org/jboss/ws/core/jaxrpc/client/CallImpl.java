@@ -48,6 +48,7 @@ import org.jboss.ws.Constants;
 import org.jboss.ws.core.CommonBindingProvider;
 import org.jboss.ws.core.CommonClient;
 import org.jboss.ws.core.CommonMessageContext;
+import org.jboss.ws.core.EndpointInvocation;
 import org.jboss.ws.core.RoleSource;
 import org.jboss.ws.core.WSTimeoutException;
 import org.jboss.ws.core.binding.TypeMappingImpl;
@@ -87,6 +88,8 @@ public class CallImpl extends CommonClient implements Call, RoleSource
    private QName portType;
    // A Map<String,Object> of Call properties
    private Map<String, Object> properties = new HashMap<String, Object>();
+   // The EndpointInvocation for the call.
+   private EndpointInvocation epInv;
 
    // The set of supported properties
    private static final Set<String> standardProperties = new HashSet<String>();
@@ -152,6 +155,14 @@ public class CallImpl extends CommonClient implements Call, RoleSource
    protected Map<String, Object> getRequestContext()
    {
       return properties;
+   }
+   
+   @Override
+   protected EndpointInvocation createEndpointInvocation(OperationMetaData opMetaData)
+   {
+      epInv = super.createEndpointInvocation(opMetaData);
+
+      return epInv;
    }
 
    /** Gets the address of a target service endpoint.

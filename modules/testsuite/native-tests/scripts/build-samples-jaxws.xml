@@ -36,6 +36,7 @@
       <fileset dir="${tests.output.dir}/test-classes">
         <include name="org/jboss/test/ws/jaxws/samples/dar/generated/*.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/dar/ClientHelper.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/dar/XMLGregorianCalendarHelper.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/dar/Client.class"/>
       </fileset>
     </jar>
@@ -49,6 +50,7 @@
         <include name="org/jboss/test/ws/jaxws/samples/dar/DarRequest.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/dar/DarResponse.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/dar/ReplyConverter.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/dar/XMLGregorianCalendarHelper.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/dar/Route.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/dar/ServiceRequest.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/dar/Stop.class"/>
@@ -58,10 +60,21 @@
         <include name="jboss.xml"/>
       </metainf>
     </jar>
+    <jar jarfile="${tests.output.dir}/test-libs/jaxws-samples-dar-queue-as6.sar">
+      <metainf dir="${tests.output.dir}/test-resources/jaxws/samples/dar">
+        <include name="hornetq-jms.xml"/>
+      </metainf>
+    </jar>
+    <jar jarfile="${tests.output.dir}/test-libs/jaxws-samples-dar-queue.sar">
+      <metainf dir="${tests.output.dir}/test-resources/jaxws/samples/dar">
+        <include name="jboss-service.xml"/>
+      </metainf>
+    </jar>
     <jar jarfile="${tests.output.dir}/test-libs/jaxws-samples-dar-addressing-client.jar">
       <fileset dir="${tests.output.dir}/test-classes">
         <include name="org/jboss/test/ws/jaxws/samples/dar/generated/*.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/dar/ClientHelper.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/dar/XMLGregorianCalendarHelper.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/dar/AddressingClient.class"/>
       </fileset>
     </jar>
@@ -92,6 +105,7 @@
       <classes dir="${tests.output.dir}/test-classes">
         <include name="org/jboss/test/ws/jaxws/samples/dar/generated/*.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/dar/ClientHelper.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/dar/XMLGregorianCalendarHelper.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/dar/JMSClient.class"/>
       </classes>
       <webinf dir="${tests.output.dir}/test-resources/jaxws/samples/dar/WEB-INF-jms">
@@ -112,6 +126,31 @@
         <include name="jboss-service.xml"/>
       </metainf>
     </jar>
+    <jar jarfile="${tests.output.dir}/test-libs/jaxws-samples-dar-jms-client-as6.sar">
+      <fileset dir="${tests.output.dir}/test-libs">
+        <include name="jaxws-samples-dar-jms-client.war"/>
+        <include name="jaxws-samples-dar-jms-client.jar"/>
+      </fileset>
+      <metainf dir="${tests.output.dir}/test-resources/jaxws/samples/dar/META-INF">
+        <include name="hornetq-jms.xml"/>
+      </metainf>
+    </jar>
+    <jar jarfile="${tests.output.dir}/test-libs/jaxws-samples-dar-jms-client-test.sar">
+      <fileset dir="${tests.output.dir}/test-libs">
+        <include name="jaxws-samples-dar-jms-client.war"/>
+      </fileset>
+      <metainf dir="${tests.output.dir}/test-resources/jaxws/samples/dar/META-INF">
+        <include name="jboss-service.xml"/>
+      </metainf>
+    </jar>
+    <jar jarfile="${tests.output.dir}/test-libs/jaxws-samples-dar-jms-client-test-as6.sar">
+      <fileset dir="${tests.output.dir}/test-libs">
+        <include name="jaxws-samples-dar-jms-client.war"/>
+      </fileset>
+      <metainf dir="${tests.output.dir}/test-resources/jaxws/samples/dar/META-INF">
+        <include name="hornetq-jms.xml"/>
+      </metainf>
+    </jar>
     
     <!-- jaxws-samples-jmstransport -->
     <jar jarfile="${tests.output.dir}/test-libs/jaxws-samples-jmstransport.jar">
@@ -119,6 +158,9 @@
         <include name="org/jboss/test/ws/jaxws/samples/jmstransport/Organization.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/jmstransport/OrganizationJMSEndpoint.class"/>
       </fileset>
+      <metainf dir="${tests.output.dir}/test-resources/jaxws/samples/jmstransport/META-INF">
+        <include name="wsdl/*.wsdl"/>
+      </metainf>
     </jar>
     <jar jarfile="${tests.output.dir}/test-libs/jaxws-samples-jmstransport.sar">
       <fileset dir="${tests.output.dir}/test-libs">
@@ -126,6 +168,16 @@
       </fileset>
       <metainf dir="${tests.output.dir}/test-resources/jaxws/samples/jmstransport/META-INF">
         <include name="jboss-service.xml"/>
+      </metainf>
+    </jar>
+    <jar jarfile="${tests.output.dir}/test-libs/jaxws-samples-jmstransport-as6.jar">
+      <fileset dir="${tests.output.dir}/test-classes">
+        <include name="org/jboss/test/ws/jaxws/samples/jmstransport/Organization.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/jmstransport/OrganizationJMSEndpoint.class"/>
+      </fileset>
+      <metainf dir="${tests.output.dir}/test-resources/jaxws/samples/jmstransport/META-INF">
+        <include name="wsdl/*.wsdl"/>
+        <include name="hornetq-jms.xml"/>
       </metainf>
     </jar>
 
@@ -150,12 +202,14 @@
       <fileset dir="${tests.output.dir}/test-classes">
         <include name="org/jboss/test/ws/jaxws/samples/news/generated/agency/*.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/news/Agency.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/news/XMLGregorianCalendarHelper.class"/>
       </fileset>
     </jar>
     <jar jarfile="${tests.output.dir}/test-libs/jaxws-samples-news-step1-printer.jar">
       <fileset dir="${tests.output.dir}/test-classes">
         <include name="org/jboss/test/ws/jaxws/samples/news/generated/printer/**/*.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/news/Printer.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/news/XMLGregorianCalendarHelper.class"/>
       </fileset>
     </jar>
     <jar jarfile="${tests.output.dir}/test-libs/jaxws-samples-news-step2-newspaper.jar">
@@ -183,6 +237,7 @@
       <fileset dir="${tests.output.dir}/test-classes">
         <include name="org/jboss/test/ws/jaxws/samples/news/generated/agency/*.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/news/Agency.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/news/XMLGregorianCalendarHelper.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/news/SecureAgency.class"/>
       </fileset>
       <metainf dir="${tests.output.dir}/test-resources/jaxws/samples/news/META-INF">
@@ -195,6 +250,7 @@
       <fileset dir="${tests.output.dir}/test-classes">
         <include name="org/jboss/test/ws/jaxws/samples/news/generated/printer/**/*.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/news/Printer.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/news/XMLGregorianCalendarHelper.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/news/SecurePrinter.class"/>
       </fileset>
     </jar>
@@ -252,8 +308,11 @@
       webxml="${tests.output.dir}/test-resources/jaxws/samples/wssecurity/WEB-INF/web.xml">
       <classes dir="${tests.output.dir}/test-classes">
         <include name="org/jboss/test/ws/jaxws/samples/wssecurity/Hello.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/wssecurity/HelloException.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/wssecurity/HelloException_Exception.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/wssecurity/HelloJavaBean.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/wssecurity/UserType.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/wssecurity/ObjectFactory.class"/>
       </classes>
       <webinf dir="${tests.output.dir}/test-resources/jaxws/samples/wssecurity/simple-encrypt/WEB-INF">
         <include name="jboss-wsse-server.xml"/>
@@ -268,10 +327,51 @@
     <war warfile="${tests.output.dir}/test-libs/jaxws-samples-wssecurity-sign.war" webxml="${tests.output.dir}/test-resources/jaxws/samples/wssecurity/WEB-INF/web.xml">
       <classes dir="${tests.output.dir}/test-classes">
         <include name="org/jboss/test/ws/jaxws/samples/wssecurity/Hello.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/wssecurity/HelloException.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/wssecurity/HelloException_Exception.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/wssecurity/HelloJavaBean.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/wssecurity/UserType.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/wssecurity/ObjectFactory.class"/>
       </classes>
       <webinf dir="${tests.output.dir}/test-resources/jaxws/samples/wssecurity/simple-sign/WEB-INF">
+        <include name="jboss-wsse-server.xml"/>
+      </webinf>
+      <webinf dir="${tests.output.dir}/test-resources/jaxws/samples/wssecurity">
+        <include name="wsse.keystore"/>
+        <include name="wsse.truststore"/>
+      </webinf>
+    </war>
+    
+    <!-- jaxws-samples-wssecurity-sign-fault -->
+    <war warfile="${tests.output.dir}/test-libs/jaxws-samples-wssecurity-sign-fault.war" webxml="${tests.output.dir}/test-resources/jaxws/samples/wssecurity/WEB-INF/web.xml">
+      <classes dir="${tests.output.dir}/test-classes">
+        <include name="org/jboss/test/ws/jaxws/samples/wssecurity/Hello.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/wssecurity/HelloException.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/wssecurity/HelloException_Exception.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/wssecurity/HelloJavaBean.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/wssecurity/UserType.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/wssecurity/ObjectFactory.class"/>
+      </classes>
+      <webinf dir="${tests.output.dir}/test-resources/jaxws/samples/wssecurity/sign-fault/WEB-INF">
+        <include name="jboss-wsse-server.xml"/>
+      </webinf>
+      <webinf dir="${tests.output.dir}/test-resources/jaxws/samples/wssecurity">
+        <include name="wsse.keystore"/>
+        <include name="wsse.truststore"/>
+      </webinf>
+    </war>
+    
+    <!-- jaxws-samples-wssecurity-sign-encrypt-fault -->
+    <war warfile="${tests.output.dir}/test-libs/jaxws-samples-wssecurity-sign-encrypt-fault.war" webxml="${tests.output.dir}/test-resources/jaxws/samples/wssecurity/WEB-INF/web.xml">
+      <classes dir="${tests.output.dir}/test-classes">
+        <include name="org/jboss/test/ws/jaxws/samples/wssecurity/Hello.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/wssecurity/HelloException.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/wssecurity/HelloException_Exception.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/wssecurity/HelloJavaBean.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/wssecurity/UserType.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/wssecurity/ObjectFactory.class"/>
+      </classes>
+      <webinf dir="${tests.output.dir}/test-resources/jaxws/samples/wssecurity/sign-encrypt-fault/WEB-INF">
         <include name="jboss-wsse-server.xml"/>
       </webinf>
       <webinf dir="${tests.output.dir}/test-resources/jaxws/samples/wssecurity">
@@ -300,6 +400,7 @@
         <include name="org/jboss/test/ws/jaxws/samples/wssecurityAnnotatedpolicy/Hello.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/wssecurityAnnotatedpolicy/HelloJavaBean.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/wssecurityAnnotatedpolicy/UserType.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/wssecurityAnnotatedpolicy/ObjectFactory.class"/>
       </classes>
       <webinf dir="${tests.output.dir}/test-resources/jaxws/samples/wssecurityAnnotatedpolicy">
         <include name="wsse.keystore"/>
@@ -317,6 +418,7 @@
         <include name="org/jboss/test/ws/jaxws/samples/wssecuritypolicy/Hello.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/wssecuritypolicy/HelloJavaBean.class"/>
         <include name="org/jboss/test/ws/jaxws/samples/wssecuritypolicy/UserType.class"/>
+        <include name="org/jboss/test/ws/jaxws/samples/wssecuritypolicy/ObjectFactory.class"/>
       </classes>
       <webinf dir="${tests.output.dir}/test-resources/jaxws/samples/wssecuritypolicy">
         <include name="wsse.keystore"/>
@@ -326,9 +428,9 @@
         <include name="wsdl/**"/>
       </webinf>
     </war>
-    
+
     <!-- Please add alphabetically -->
-    
+
   </target>
-  
+
 </project>

@@ -1,6 +1,6 @@
 /*
  * JBoss, Home of Professional Open Source.
- * Copyright 2006, Red Hat Middleware LLC, and individual contributors
+ * Copyright 2009, Red Hat Middleware LLC, and individual contributors
  * as indicated by the @author tags. See the copyright.txt file in the
  * distribution for a full listing of individual contributors.
  *
@@ -49,10 +49,9 @@ import javax.xml.soap.SOAPPart;
 import javax.xml.ws.addressing.AddressingProperties;
 import javax.xml.ws.addressing.JAXWSAConstants;
 import javax.xml.ws.http.HTTPBinding;
+import javax.xml.ws.soap.AddressingFeature;
 
 import org.jboss.logging.Logger;
-import org.jboss.netty.handler.codec.http.HttpMessage;
-import org.jboss.netty.handler.codec.http.HttpRequest;
 import org.jboss.ws.Constants;
 import org.jboss.ws.WSException;
 import org.jboss.ws.core.CommonBinding;
@@ -115,16 +114,31 @@ public class RequestHandlerImpl implements RequestHandler
    // provide logging
    private static final Logger log = Logger.getLogger(RequestHandlerImpl.class);
 
-   private ServerConfig serverConfig;
-   private MessageFactoryImpl msgFactory;
+   protected ServerConfig serverConfig;
+   protected MessageFactoryImpl msgFactory;
 
-   RequestHandlerImpl()
+   public RequestHandlerImpl()
    {
-      SPIProvider spiProvider = SPIProviderResolver.getInstance().getProvider();
-      serverConfig = spiProvider.getSPI(ServerConfigFactory.class).getServerConfig();
-      msgFactory = new MessageFactoryImpl();
+      final SPIProvider spiProvider = SPIProviderResolver.getInstance().getProvider();
+      final ServerConfig serverConfig = spiProvider.getSPI(ServerConfigFactory.class).getServerConfig();
+      
+      this.init(serverConfig);
+   }
+   
+   public RequestHandlerImpl(final ServerConfig serverConfig)
+   {
+      if (serverConfig == null) 
+         throw new IllegalArgumentException("server config cannot be null");
+      
+      this.init(serverConfig);
    }
 
+   private void init(final ServerConfig serverConfig)
+   {
+      this.serverConfig = serverConfig;
+      this.msgFactory = new MessageFactoryImpl();
+   }
+   
    public void handleHttpRequest(Endpoint endpoint, HttpServletRequest req, HttpServletResponse res, ServletContext context) throws ServletException, IOException
    {
       String method = req.getMethod();
@@ -234,6 +248,7 @@ public class RequestHandlerImpl implements RequestHandler
       }
    }
 
+   @SuppressWarnings("unchecked")
    public void handleRequest(Endpoint endpoint, InputStream inStream, OutputStream outStream, InvocationContext invContext)
    {
       if (log.isDebugEnabled())
@@ -257,6 +272,7 @@ public class RequestHandlerImpl implements RequestHandler
          msgContext = new SOAPMessageContextJAXWS();
          msgContext.put(MessageContextJAXWS.MESSAGE_OUTBOUND_PROPERTY, Boolean.valueOf(false));
          msgContext.put(MessageContextJAXWS.INBOUND_MESSAGE_ATTACHMENTS, new HashMap<String, DataHandler>());
+         msgContext.put(MessageContextJAXWS.OUTBOUND_MESSAGE_ATTACHMENTS, new HashMap<String, DataHandler>());
          invContext.addAttachment(javax.xml.ws.handler.MessageContext.class, msgContext);
       }
 
@@ -384,6 +400,12 @@ public class RequestHandlerImpl implements RequestHandler
       CommonMessageContext msgContext = MessageContextAssociation.peekMessageContext();
       EndpointMetaData epMetaData = msgContext.getEndpointMetaData();
       MessageAbstraction resMessage = msgContext.getMessageAbstraction();
+      
+      if (resMessage == null)
+      {
+         log.debug("Null response message");
+         return;
+      }
 
       String wsaTo = null;
 
@@ -393,7 +415,9 @@ public class RequestHandlerImpl implements RequestHandler
       {
          AddressingConstantsImpl ADDR = new AddressingConstantsImpl();
          wsaTo = outProps.getTo().getURI().toString();
-         if (wsaTo.equals(ADDR.getAnonymousURI()))
+         final AddressingFeature addressing = epMetaData.getFeature(AddressingFeature.class);
+         final boolean onlyAnonymousAllowed = addressing != null && addressing.getResponses() == AddressingFeature.Responses.ANONYMOUS;
+         if (wsaTo.equals(ADDR.getAnonymousURI()) || onlyAnonymousAllowed)
             wsaTo = null;
       }
       if (wsaTo != null)
@@ -691,20 +715,16 @@ public class RequestHandlerImpl implements RequestHandler
       ServerEndpointMetaData epMetaData = endpoint.getAttachment(ServerEndpointMetaData.class);
       if (epMetaData == null)
          throw new IllegalStateException("Cannot obtain endpoint meta data");
+      
+      //The WSDLFilePublisher should set the location to an URL 
+      URL wsdlLocation = epMetaData.getServiceMetaData().getWsdlLocation();
+      String wsdlPublishLoc = epMetaData.getServiceMetaData().getWsdlPublishLocation();
 
-      String wsdlHost = reqURL.getHost();
-
-      if (ServerConfig.UNDEFINED_HOSTNAME.equals(serverConfig.getWebServiceHost()) == false)
-         wsdlHost = serverConfig.getWebServiceHost();
-
-      if (log.isDebugEnabled())
-         log.debug("WSDL request, using host: " + wsdlHost);
-
-      WSDLRequestHandler wsdlRequestHandler = new WSDLRequestHandler(epMetaData);
-      Document document = wsdlRequestHandler.getDocumentForPath(reqURL, wsdlHost, resPath);
+      WSDLRequestHandler wsdlRequestHandler = new WSDLRequestHandler(wsdlLocation, wsdlPublishLoc, serverConfig);
+      Document document = wsdlRequestHandler.getDocumentForPath(reqURL, resPath);
 
       OutputStreamWriter writer = new OutputStreamWriter(outputStream);
-      new DOMWriter(writer).setPrettyprint(true).print(document.getDocumentElement());
+      new DOMWriter(writer, Constants.DEFAULT_XML_CHARSET).setPrettyprint(true).print(document);
    }
 
    private void handleException(Exception ex) throws ServletException

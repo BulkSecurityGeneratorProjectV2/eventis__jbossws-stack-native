@@ -27,6 +27,7 @@ import java.net.ConnectException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.channels.ClosedChannelException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -74,14 +75,17 @@ import org.jboss.ws.metadata.umdm.EndpointMetaData;
  */
 public class NettyClient
 {
-   public static final String RESPONSE_CODE = "ResponseCode";
-   public static final String RESPONSE_CODE_MESSAGE = "ResponseCodeMessage";
-   public static final String PROTOCOL = "Protocol";
+   public static final String RESPONSE_CODE = "org.jboss.ws.core.client.transport.NettyClient#ResponseCode";
+   public static final String RESPONSE_CODE_MESSAGE = "org.jboss.ws.core.client.transport.NettyClient#ResponseCodeMessage";
+   public static final String PROTOCOL = "org.jboss.ws.core.client.transport.NettyClient#Protocol";
+   public static final String RESPONSE_HEADERS = "org.jboss.ws.core.client.transport.NettyClient#ResponseHeaders";
    private static Logger log = Logger.getLogger(NettyClient.class);
    
    private Marshaller marshaller;
    private UnMarshaller unmarshaller;
    private Long timeout;
+   private Long connectionTimeout;
+   private Long receiveTimeout;
    private static final int DEFAULT_CHUNK_SIZE = 1024;
    //We always use chunked transfer encoding unless explicitly disabled by user 
    private Integer chunkSize = new Integer(DEFAULT_CHUNK_SIZE);
@@ -147,17 +151,33 @@ public class NettyClient
       NettyTransportHandler transport = NettyTransportHandler.getInstance(target, NettyHelper.getChannelPipelineFactory(getSSLHandler(target, callProps)));
       Channel channel = null;
       Map<String, Object> resHeaders = null;
+      Map<String, Object> resMetadata = null;
       try
       {
          setActualTimeout(callProps);
-         channel = transport.getChannel(timeout);
+         //JBWS-3114:Provide the new connection timeout configuration
+         if (callProps.containsKey(StubExt.PROPERTY_CONNECTION_TIMEOUT))
+         {
+            connectionTimeout = new Long(callProps.get(StubExt.PROPERTY_CONNECTION_TIMEOUT).toString());
+         }
+         else
+         {
+            if (timeout != null)
+            {
+               connectionTimeout = timeout;
+            }
+         }
+       
+         channel = transport.getChannel(connectionTimeout);
          
          WSResponseHandler responseHandler = new WSResponseHandler();
          NettyHelper.setResponseHandler(channel, responseHandler);
-         
+
          //Send the HTTP request
-         HttpRequest request = new DefaultHttpRequest(HttpVersion.HTTP_1_1, reqMessage != null ? HttpMethod.POST : HttpMethod.GET, targetAddress);
-         request.addHeader(HttpHeaders.Names.HOST, target.getHost());
+         String targetRequestUri = isProxyRequest(additionalHeaders) ? targetAddress : getRelativeRequestUri(target); 
+
+         HttpRequest request = new DefaultHttpRequest(HttpVersion.HTTP_1_1, reqMessage != null ? HttpMethod.POST : HttpMethod.GET, targetRequestUri);
+         request.addHeader(HttpHeaders.Names.HOST, target.getAuthority());
          request.addHeader(HttpHeaders.Names.CONNECTION, HttpHeaders.Values.KEEP_ALIVE);
          setAdditionalHeaders(request, additionalHeaders);
          setActualChunkedLength(request, callProps);
@@ -175,9 +195,21 @@ public class NettyClient
          //Get the response
          Future<Result> futureResult = responseHandler.getFutureResult();
          Result result = null;
+         if (callProps.containsKey(StubExt.PROPERTY_RECEIVE_TIMEOUT))
+         {
+            receiveTimeout = new Long(callProps.get(StubExt.PROPERTY_RECEIVE_TIMEOUT).toString());
+         }
+         else
+         {
+            if (timeout != null)
+            {
+               receiveTimeout = timeout;
+            }
+         }
          try
          {
-        	 result = timeout == null ? futureResult.get() : futureResult.get(timeout, TimeUnit.MILLISECONDS);
+            result = receiveTimeout == null ? futureResult.get() : futureResult.get(receiveTimeout,
+                  TimeUnit.MILLISECONDS);
          }
          catch (ExecutionException ee)
          {
@@ -185,14 +217,19 @@ public class NettyClient
         	 Throwable t = ee.getCause();
         	 throw t != null ? t : ee;
          }
+	 catch (TimeoutException te) 
+	 {
+	    throw new WSTimeoutException("Receive timeout", receiveTimeout == null ? -1 : receiveTimeout);
+	 }
          resHeaders = result.getResponseHeaders();
-         Object resMessage = oneway ? null : unmarshaller.read(result.getResponse(), resHeaders);
+         resMetadata = result.getMetadata();
+         Object resMessage = oneway ? null : unmarshaller.read(result.getResponse(), resMetadata, resHeaders);
          
          //Update props with response headers (required to maintain session using cookies)
          callProps.clear();
-         if (resHeaders != null)
-         {
-            callProps.putAll(resHeaders);
+         callProps.put(RESPONSE_HEADERS, resHeaders != null ? resHeaders : new HashMap<String, Object>());
+         if (resMetadata != null) {
+            callProps.putAll(resMetadata);
          }
 
          return resMessage;
@@ -208,13 +245,13 @@ public class NettyClient
          transport.end();
          throw ce;
       }
+      catch (TimeoutException te) 
+      {
+	 throw new WSTimeoutException("Connection timeout", connectionTimeout == null ? -1 : connectionTimeout);
+      }
       catch (IOException ioe)
       {
          throw ioe;
-      }
-      catch (TimeoutException te)
-      {
-         throw new WSTimeoutException(te.getMessage(), timeout);
       }
       catch (WSTimeoutException toe)
       {
@@ -233,10 +270,23 @@ public class NettyClient
          {
             NettyHelper.clearResponseHandler(channel);
          }
-         transport.finished(resHeaders);
+         transport.finished(resMetadata, resHeaders); //provide both headers and metadata to the transport to allow for proper keepAlive checks
       }
    }
+
+   private static boolean isProxyRequest(Map<String, Object> additionalHeaders)
+   {
+       // callProps may also need to be checked
+       return additionalHeaders.containsKey(HttpHeaders.Names.PROXY_AUTHORIZATION);
+   }  
       
+   private static String getRelativeRequestUri(URL target) 
+   {
+      return target.getPath() + 
+         		    (target.getQuery() != null ? "?" + target.getQuery() : "") + 
+         		    (target.getRef() != null ? "#" + target.getRef() : "");      
+   }
+
    private static SslHandler getSSLHandler(URL target, Map<String, Object> callProps) throws IOException
    {
       SslHandler handler = null;
@@ -304,21 +354,20 @@ public class NettyClient
             if (sizeValue != null)
                chunkSize = Integer.valueOf(sizeValue);
 
-            //override using call props
-            try
-            {
-               Object obj = callProps.get(StubExt.PROPERTY_CHUNKED_ENCODING_SIZE);
-               if (obj != null) //explicit 0 value is required to disable chunked mode
-                  chunkSize = (Integer)obj;
-            }
-            catch (Exception e)
-            {
-               log.warn("Can't set chunk size from call properties, illegal value provided!");
-            }
-            
             //fastinfoset always disable chunking
             if (epMetaData.isFeatureEnabled(FastInfosetFeature.class))
                chunkSize = 0;
+         }
+         //override using call props
+         try
+         {
+            Object obj = callProps.get(StubExt.PROPERTY_CHUNKED_ENCODING_SIZE);
+            if (obj != null) //explicit 0 value is required to disable chunked mode
+               chunkSize = (Integer)obj;
+         }
+         catch (Exception e)
+         {
+            log.warn("Can't set chunk size from call properties, illegal value provided!");
          }
       }
    }

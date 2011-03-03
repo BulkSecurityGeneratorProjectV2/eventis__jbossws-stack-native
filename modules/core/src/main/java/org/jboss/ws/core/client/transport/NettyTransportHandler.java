@@ -41,6 +41,7 @@ import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
 import org.jboss.netty.handler.codec.http.HttpHeaders;
 import org.jboss.netty.handler.codec.http.HttpVersion;
 import org.jboss.ws.Constants;
+import org.jboss.wsf.spi.util.ServiceLoader;
 
 /**
  * This handles the Netty channels, allowing for a
@@ -58,7 +59,7 @@ public class NettyTransportHandler
    private URL url;
    private ChannelFuture connectFuture;
    private Channel channel;
-   private ChannelFactory factory;
+   private static ClientSocketChannelFactoryProvider factoryProvider;
    //the idle cache
    private static KeepAliveCache cache = new KeepAliveCache();
    private static boolean keepAliveProp = true;
@@ -71,9 +72,6 @@ public class NettyTransportHandler
    private int keepAliveConnections = DEFAULT_KEEP_ALIVE_CONS;
    //the keep alive timeout in seconds
    private int keepAliveTimeout;
-   
-   private static Executor bossExecutor = Executors.newCachedThreadPool();
-   private static Executor workerExecutor = Executors.newCachedThreadPool();
    
    static
    {
@@ -91,13 +89,14 @@ public class NettyTransportHandler
       {
          keepAliveProp = true;
       }
+      factoryProvider = (ClientSocketChannelFactoryProvider)ServiceLoader.loadService(ClientSocketChannelFactoryProvider.class.getName(),
+            DefaultClientSocketChannelFactoryProvider.class.getName());
    }
 
    private NettyTransportHandler(URL url, ChannelPipelineFactory pipelineFactory)
    {
       this.url = url;
-      
-      factory = new NioClientSocketChannelFactory(bossExecutor, workerExecutor);
+      ChannelFactory factory = factoryProvider.getClientSocketChannelFactoryInstance();
       ClientBootstrap bootstrap = new ClientBootstrap(factory);
       bootstrap.setPipelineFactory(pipelineFactory);
       
@@ -181,9 +180,9 @@ public class NettyTransportHandler
     * 
     * @param headers The received message's headers
     */
-   public void goOn(Map<String, Object> headers)
+   public void goOn(Map<String, Object> metadata, Map<String, Object> headers)
    {
-      checkKeepAliveHeaders(headers);
+      checkKeepAliveHeaders(metadata, headers);
    }
    
    
@@ -196,9 +195,9 @@ public class NettyTransportHandler
     * @param headers The received message's headers
     * 
     */
-   public void finished(Map<String, Object> headers)
+   public void finished(Map<String, Object> metadata, Map<String, Object> headers)
    {
-      checkKeepAliveHeaders(headers);
+      checkKeepAliveHeaders(metadata, headers);
       keepAliveConnections--;
       if (keepAliveConnections > 0 && isKeepingAlive())
       {
@@ -218,9 +217,9 @@ public class NettyTransportHandler
     * 
     * @param headers The received message's headers
     */
-   protected void checkKeepAliveHeaders(Map<String, Object> headers)
+   protected void checkKeepAliveHeaders(Map<String, Object> metadata, Map<String, Object> headers)
    {
-      if (headers == null) return;
+      if (headers == null || metadata == null) return;
       keepAliveConnections = -1;
       keepAliveTimeout = 0;
       try
@@ -249,7 +248,7 @@ public class NettyTransportHandler
                }
             }
          }
-         else if (HttpVersion.HTTP_1_1.toString().equals(NettyHelper.getFirstHeaderAsString(headers, NettyClient.PROTOCOL)))
+         else if (HttpVersion.HTTP_1_1.toString().equals(NettyHelper.getFirstHeaderAsString(metadata, NettyClient.PROTOCOL)))
          {
             //Consider the only valid value for Connection in responses is "close" 
             keepAliveConnections = (connectionHeader == null) ? DEFAULT_KEEP_ALIVE_CONS : 1;

@@ -27,15 +27,13 @@ import javax.xml.namespace.QName;
 import javax.xml.rpc.ParameterMode;
 import javax.xml.soap.AttachmentPart;
 
-import org.jboss.ws.metadata.umdm.EndpointMetaData;
-
 /**
  * An extension of the standard JAXRPC/JAXWS stubs.
  *
  * @author Thomas.Diesler@jboss.org
  * @since 17-Jan-2007
  */
-public interface StubExt extends ConfigProvider
+public interface StubExt extends ConfigProvider, EndpointMetadataProvider
 {
    /** ClientTimeout property: org.jboss.ws.timeout */
    static final String PROPERTY_CLIENT_TIMEOUT = "org.jboss.ws.timeout";
@@ -49,6 +47,8 @@ public interface StubExt extends ConfigProvider
    static final String PROPERTY_KEY_STORE_PASSWORD = "org.jboss.ws.keyStorePassword";
    /** KeyStoreType property: org.jboss.ws.keyStoreType */
    static final String PROPERTY_KEY_STORE_TYPE = "org.jboss.ws.keyStoreType";
+   /** SocketFactory property: org.jboss.ws.socketFactory */
+   static final String PROPERTY_SOCKET_FACTORY = "org.jboss.ws.socketFactory";
    /** Remoting SSL Protocol property: org.jboss.ws.sslProtocol */
    static final String PROPERTY_SSL_PROTOCOL = "org.jboss.ws.sslProtocol";
    /** Remoting SSL Provider Name property: org.jboss.ws.sslProviderName */
@@ -69,12 +69,19 @@ public interface StubExt extends ConfigProvider
    static final String PROPERTY_AUTH_TYPE_WSSE = "org.jboss.ws.authType.wsse";
    /** Enable MTOM on the stub */
    static final String PROPERTY_MTOM_ENABLED= "org.jboss.ws.mtom.enabled";
-
-   /**
-    * Get the endpoint meta data for this stub
-    */
-   EndpointMetaData getEndpointMetaData();
+   /** HTTP chunk size */
+   static final String PROPERTY_CHUNKED_ENCODING_SIZE = "http://org.jboss.ws/http#chunksize";
    
+   //New added property to provide stack agnostic timeout configuration(JBWS-3114)
+   /** Client ConnectionTimeout property: javax.xml.ws.client.connectionTimeout */
+   static final String PROPERTY_CONNECTION_TIMEOUT = "javax.xml.ws.client.connectionTimeout";
+   
+   /** Client ReceiveTimeout property: javax.xml.ws.client.receiveTimeout */
+   static final String PROPERTY_RECEIVE_TIMEOUT = "javax.xml.ws.client.receiveTimeout";
+   
+   
+   
+
    /**
     * Add a header that is not bound to an input parameter.
     * A propriatory extension, that is not part of JAXRPC.

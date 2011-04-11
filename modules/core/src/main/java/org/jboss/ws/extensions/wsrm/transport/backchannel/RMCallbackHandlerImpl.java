@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.jboss.logging.Logger;
-import org.jboss.remoting.InvocationRequest;
 import org.jboss.ws.core.MessageTrace;
 import org.jboss.ws.extensions.wsrm.transport.RMMessage;
 import org.jboss.ws.extensions.wsrm.transport.RMUnassignedMessageListener;
@@ -56,7 +55,18 @@ public final class RMCallbackHandlerImpl implements RMCallbackHandler
    {
       super();
       this.handledPath = handledPath;
-      logger.debug("Registered callback handler listening on '" + handledPath + "' request path");
+      if (logger.isDebugEnabled())
+         logger.debug("Registered callback handler listening on '" + handledPath + "' request path");
+   }
+   
+   public void init()
+   {
+      // does nothing
+   }
+   
+   public void destroy()
+   {
+      // does nothing
    }
    
    public Throwable getFault(String messageId)
@@ -65,14 +75,13 @@ public final class RMCallbackHandlerImpl implements RMCallbackHandler
       return null;
    }
 
-   public final String getHandledPath()
+   public final String getPath()
    {
       return this.handledPath;
    }
 
-   public final void handle(InvocationRequest request)
+   public final void handle(RMMessage message)
    {
-      RMMessage message = (RMMessage)request.getParameter();
       synchronized (instanceLock)
       {
          String requestMessage = new String(message.getPayload());
@@ -84,7 +93,8 @@ public final class RMCallbackHandlerImpl implements RMCallbackHandler
          if (begin != -1)
          {
             String messageId = requestMessage.substring(begin, end);
-            logger.debug("Arrived message id: " + messageId);
+            if (logger.isDebugEnabled())
+               logger.debug("Arrived message id: " + messageId);
             this.arrivedMessages.put(messageId, message); 
          }
          else
@@ -118,7 +128,8 @@ public final class RMCallbackHandlerImpl implements RMCallbackHandler
          {
             try
             {
-               logger.debug("waiting for response with message id: " + messageId);
+               if (logger.isDebugEnabled())
+                  logger.debug("waiting for response with message id: " + messageId);
                instanceLock.wait(100);
             }
             catch (InterruptedException ie)

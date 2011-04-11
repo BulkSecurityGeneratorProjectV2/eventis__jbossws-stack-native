@@ -28,6 +28,8 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -43,6 +45,7 @@ import javax.management.MBeanServer;
 import javax.management.MBeanServerFactory;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
+import javax.xml.XMLConstants;
 import javax.xml.bind.JAXBElement;
 import javax.xml.namespace.QName;
 import javax.xml.parsers.DocumentBuilder;
@@ -181,21 +184,21 @@ public class SubscriptionManager implements SubscriptionManagerMBean, EventDispa
       {
          // remove event dispatcher
          Util.unbind(new InitialContext(), EventingConstants.DISPATCHER_JNDI_NAME);
-
-         // stop thread pool
-         threadPool.shutdown();
-
-         // stop the watchdog
-         watchDog.shutdown();
-
-         for (URI eventSourceNS : eventSourceMapping.keySet())
-         {
-            removeEventSource(eventSourceNS);
-         }
       }
       catch (NamingException e)
       {
          // ignore
+      }
+      
+      // stop thread pool
+      threadPool.shutdown();
+
+      // stop the watchdog
+      watchDog.shutdown();
+
+      for (URI eventSourceNS : eventSourceMapping.keySet())
+      {
+         removeEventSource(eventSourceNS);
       }
    }
 
@@ -534,6 +537,7 @@ public class SubscriptionManager implements SubscriptionManagerMBean, EventDispa
          }
 
          factory.setAttribute("http://java.sun.com/xml/jaxp/properties/schemaSource", is);
+         factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
          DocumentBuilder docBuilder = factory.newDocumentBuilder();
          ErrorHandler errorHandler = new Validator();
          docBuilder.setErrorHandler(errorHandler);
@@ -621,7 +625,7 @@ public class SubscriptionManager implements SubscriptionManagerMBean, EventDispa
    {
 
       private ConcurrentMap<URI, List<Subscription>> subscriptions;
-      private boolean active = true;
+      private volatile boolean active = true;
       private Thread worker;
 
       public WatchDog(ConcurrentMap<URI, List<Subscription>> subscriptions)
@@ -633,7 +637,6 @@ public class SubscriptionManager implements SubscriptionManagerMBean, EventDispa
       {
          while (active)
          {
-
             for (List<Subscription> subscriptions : subscriptionMapping.values())
             {
                for (Subscription s : subscriptions)
@@ -652,7 +655,10 @@ public class SubscriptionManager implements SubscriptionManagerMBean, EventDispa
             }
             catch (InterruptedException e)
             {
-               log.error(e);
+               if (active)
+               {
+                  log.error(e);
+               }
             }
          }
       }
@@ -660,12 +666,28 @@ public class SubscriptionManager implements SubscriptionManagerMBean, EventDispa
       public void startup()
       {
          worker = new Thread(this, "SubscriptionWatchDog");
+         worker.setDaemon(true);
          worker.start();
       }
 
       public void shutdown()
       {
          this.active = false;
+         SecurityManager sm = System.getSecurityManager();
+         if (sm == null)
+         {
+            worker.interrupt();
+         }
+         else
+         {
+            AccessController.doPrivileged(new PrivilegedAction<Object>() {
+               public Object run()
+               {
+                  worker.interrupt();
+                  return null;
+               }
+            });
+         }
       }
 
    }

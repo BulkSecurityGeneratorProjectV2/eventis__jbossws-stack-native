@@ -23,23 +23,16 @@ package org.jboss.ws.core;
 
 import org.jboss.logging.Logger;
 import org.jboss.ws.core.binding.SerializationContext;
-import org.jboss.ws.core.soap.MessageFactoryImpl;
 import org.jboss.ws.core.soap.attachment.SwapableMemoryDataSource;
 import org.jboss.ws.extensions.xop.XOPContext;
 import org.jboss.ws.metadata.umdm.EndpointMetaData;
 import org.jboss.ws.metadata.umdm.OperationMetaData;
-import org.jboss.wsf.common.DOMUtils;
 import org.jboss.xb.binding.NamespaceRegistry;
-import org.w3c.dom.Element;
 
 import javax.xml.soap.AttachmentPart;
-import javax.xml.soap.SOAPElement;
 import javax.xml.soap.SOAPException;
 import javax.xml.soap.SOAPMessage;
 import javax.xml.ws.handler.MessageContext.Scope;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -59,9 +52,9 @@ public abstract class CommonMessageContext implements Map<String, Object>
 
    // expandToDOM in the SOAPContentElement should not happen during normal operation 
    // This property should be set the message context when it is ok to do so.
-   public static String ALLOW_EXPAND_TO_DOM = "org.jboss.ws.allow.expand.dom";
+   public static final String ALLOW_EXPAND_TO_DOM = "org.jboss.ws.allow.expand.dom";
 
-   public static String REMOTING_METADATA = "org.jboss.ws.remoting.metadata";
+   public static final String REMOTING_METADATA = "org.jboss.ws.remoting.metadata";
 
    // The serialization context for this message ctx
    private SerializationContext serContext;
@@ -77,6 +70,7 @@ public abstract class CommonMessageContext implements Map<String, Object>
    protected Scope currentScope = Scope.APPLICATION;
 
    private boolean isModified;
+   private Throwable currentException;
 
    public CommonMessageContext()
    {
@@ -91,6 +85,16 @@ public abstract class CommonMessageContext implements Map<String, Object>
       this.serContext = msgContext.serContext;
       this.scopedProps = new HashMap<String, ScopedProperty>(msgContext.scopedProps);
       this.currentScope = msgContext.currentScope;
+   }
+   
+   public Throwable getCurrentException()
+   {
+      return currentException;
+   }
+   
+   public void setCurrentException(Throwable t)
+   {
+      this.currentException = t;
    }
 
    public Scope getCurrentScope()
@@ -129,44 +133,14 @@ public abstract class CommonMessageContext implements Map<String, Object>
    public SOAPMessage getSOAPMessage()
    {
       if(message!=null && ((message instanceof SOAPMessage) == false))
-         throw new UnsupportedOperationException("No SOAPMessage available. Current message context carries " + message.getClass());
+         throw new UnsupportedOperationException("No SOAPMessage avilable. Current message context carries " + message.getClass());
       return (SOAPMessage)message;
    }
 
    public void setSOAPMessage(SOAPMessage soapMessage)
    {
-      if (soapMessage instanceof MessageAbstraction)
-      {
-         this.message = (MessageAbstraction)soapMessage;
-      }
-      else
-      {
-         try
-         {
-            this.message = rebuild(soapMessage);
-         }
-         catch (Exception e)
-         {
-            e.printStackTrace();
-            throw new RuntimeException();
-         }
-         
-      }
-//      this.message = (MessageAbstraction)soapMessage;
+      this.message = (MessageAbstraction)soapMessage;
       this.setModified(true);
-   }
-   
-   private static MessageAbstraction rebuild(SOAPMessage message) throws Exception
-   {
-      if (message == null)
-         return null;
-      //TODO!!!! do this better...
-      ByteArrayOutputStream baos = new ByteArrayOutputStream();
-      message.writeTo(baos);
-      MessageFactoryImpl factory = new MessageFactoryImpl();
-      String mex = baos.toString("UTF-8");
-      System.out.println("REBUILDO!!!");
-      return (MessageAbstraction)factory.createMessage(message.getMimeHeaders(), new ByteArrayInputStream(mex.getBytes("UTF-8")));
    }
 
    public MessageAbstraction getMessageAbstraction()
@@ -281,7 +255,8 @@ public abstract class CommonMessageContext implements Map<String, Object>
          }
          catch (IllegalArgumentException ex)
          {
-            log.debug("Ignore: " + ex.getMessage());
+            if (log.isDebugEnabled())
+               log.debug("Ignore: " + ex.getMessage());
          }
       }
    }

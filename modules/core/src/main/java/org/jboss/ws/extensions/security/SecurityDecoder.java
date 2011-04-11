@@ -26,6 +26,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 
+import org.apache.xml.security.Init;
 import org.jboss.ws.extensions.security.element.EncryptedKey;
 import org.jboss.ws.extensions.security.element.SecurityHeader;
 import org.jboss.ws.extensions.security.element.SecurityProcess;
@@ -67,7 +68,7 @@ public class SecurityDecoder
    
    private TimestampVerification timestampVerification;
    
-   private Authenticate authenticate;
+   private Authenticate authenticate;   
 
    private HashSet<String> signedIds = new HashSet<String>();
 
@@ -75,7 +76,16 @@ public class SecurityDecoder
 
    public SecurityDecoder(SecurityStore store, NonceFactory nonceFactory, TimestampVerification timestampVerification, Authenticate authenticate)
    {
-      org.apache.xml.security.Init.init();
+      final ClassLoader origCL = SecurityActions.getContextClassLoader();
+      try 
+      {
+         SecurityActions.setContextClassLoader(Init.class.getClassLoader());
+         Init.init();
+      }
+      finally
+      {
+          SecurityActions.setContextClassLoader(origCL);
+      }
       this.store = store;
       this.nonceFactory = nonceFactory;
       this.timestampVerification = timestampVerification;
@@ -155,8 +165,7 @@ public class SecurityDecoder
             if (ids != null)
                encryptedIds.addAll(ids);
          }
-      }
-      
+      }      
       
    }
 

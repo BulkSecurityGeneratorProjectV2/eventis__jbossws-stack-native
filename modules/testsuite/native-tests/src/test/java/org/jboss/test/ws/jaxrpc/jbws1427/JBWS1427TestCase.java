@@ -21,7 +21,6 @@
  */
 package org.jboss.test.ws.jaxrpc.jbws1427;
 
-import java.io.File;
 import java.net.URL;
 
 import javax.xml.namespace.QName;
@@ -40,7 +39,7 @@ import org.jboss.wsf.test.JBossWSTestSetup;
 
 /**
  * [JBWS-1427] - Handling of invalid binding port type ref and doc/lit message parts
- * 
+ *
  * http://jira.jboss.org/jira/browse/JBWS-1427
  *
  * @author Thomas.Diesler@jboss.com
@@ -49,7 +48,7 @@ import org.jboss.wsf.test.JBossWSTestSetup;
 public class JBWS1427TestCase extends JBossWSTest
 {
    private static RequestService port;
-   
+
    public static Test suite()
    {
       return new JBossWSTestSetup(JBWS1427TestCase.class, "jaxrpc-jbws1427.jar");
@@ -66,17 +65,15 @@ public class JBWS1427TestCase extends JBossWSTest
          QName serviceName = new QName("http://za.co.testws.interfaces", "ProcessClaim");
          Service service = factory.createService(wsdlURL, serviceName , mappingURL);
          port = (RequestService)service.getPort(RequestService.class);
-         ((Stub)port)._setProperty(Stub.ENDPOINT_ADDRESS_PROPERTY, "http://" + getServerHost() + ":8080/jaxrpc-jbws1427/SubmitRequestEJB");
+         ((Stub)port)._setProperty(Stub.ENDPOINT_ADDRESS_PROPERTY, "http://" + getServerHost() + ":8080/jaxrpc-jbws1427/RequestServiceEJB");
       }
    }
 
    public final void testWsdlParser() throws Exception
    {
       WSDLDefinitionsFactory factory = WSDLDefinitionsFactory.newInstance();
-      File wsdlFile = getResourceFile("jaxrpc/jbws1427/META-INF/wsdl/ProcessClaim.wsdl");
-      assertTrue("File exists: " + wsdlFile, wsdlFile.exists());
-      
-      factory.parse(wsdlFile.toURL());
+      URL wsdlFile = getResourceURL("jaxrpc/jbws1427/META-INF/wsdl/ProcessClaim.wsdl");
+      factory.parse(wsdlFile);
    }
 
    public final void testEndpointAccess() throws Exception

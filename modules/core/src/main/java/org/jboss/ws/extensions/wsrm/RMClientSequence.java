@@ -43,6 +43,9 @@ import javax.xml.ws.addressing.JAXWSAConstants;
 
 import org.jboss.logging.Logger;
 import org.jboss.ws.core.jaxws.client.ClientImpl;
+import org.jboss.ws.core.server.netty.NettyCallbackHandler;
+import org.jboss.ws.core.server.netty.NettyHttpServer;
+import org.jboss.ws.core.server.netty.NettyHttpServerFactory;
 import org.jboss.ws.extensions.addressing.AddressingClientUtil;
 import org.jboss.ws.extensions.wsrm.config.RMConfig;
 import org.jboss.ws.extensions.wsrm.api.RMException;
@@ -50,6 +53,7 @@ import org.jboss.ws.extensions.wsrm.protocol.RMConstants;
 import org.jboss.ws.extensions.wsrm.protocol.RMProvider;
 import org.jboss.ws.extensions.wsrm.protocol.spi.RMIncompleteSequenceBehavior;
 import org.jboss.ws.extensions.wsrm.transport.RMUnassignedMessageListener;
+import org.jboss.ws.extensions.wsrm.transport.backchannel.RMRequestHandlerFactory;
 import org.jboss.wsf.common.utils.UUIDGenerator;
 
 /**
@@ -99,7 +103,8 @@ public final class RMClientSequence implements RMSequence, RMUnassignedMessageLi
             if (host == null)
             {
                host = InetAddress.getLocalHost().getCanonicalHostName();
-               logger.debug("Backports server configuration omits host configuration - using autodetected " + host);
+               if (logger.isDebugEnabled())
+                  logger.debug("Backports server configuration omits host configuration - using autodetected " + host);
             }  
             String port = wsrmConfig.getBackPortsServer().getPort();
             String path = PATH_PREFIX + UUIDGenerator.generateRandomUUIDString();
@@ -122,8 +127,11 @@ public final class RMClientSequence implements RMSequence, RMUnassignedMessageLi
    {
       // we can't use objectLock in the method - possible deadlock
       this.countOfUnassignedMessagesAvailable.addAndGet(1);
-      logger.debug("Expected sequence expiration in " + ((System.currentTimeMillis() - this.creationTime) / 1000) + "seconds");
-      logger.debug("Unassigned message available in callback handler");
+      if (logger.isDebugEnabled())
+      {
+         logger.debug("Expected sequence expiration in " + ((System.currentTimeMillis() - this.creationTime) / 1000) + "seconds");
+         logger.debug("Unassigned message available in callback handler");
+      }
    }
    
    public final RMConfig getRMConfig()
@@ -144,13 +152,15 @@ public final class RMClientSequence implements RMSequence, RMUnassignedMessageLi
    public final void setFinal()
    {
       this.isFinal = true;
-      logger.debug("Sequence " + this.outgoingSequenceId + " state changed to final");
+      if (logger.isDebugEnabled())
+         logger.debug("Sequence " + this.outgoingSequenceId + " state changed to final");
    }
    
    public final void ackRequested(boolean requested)
    {
       this.inboundMessageAckRequested.set(requested);
-      logger.debug("Inbound Sequence: " + this.incomingSequenceId + ", ack requested. Messages in the queue: " + this.receivedInboundMessages);
+      if (logger.isDebugEnabled())
+         logger.debug("Inbound Sequence: " + this.incomingSequenceId + ", ack requested. Messages in the queue: " + this.receivedInboundMessages);
    }
    
    public final boolean isAckRequested()
@@ -161,13 +171,15 @@ public final class RMClientSequence implements RMSequence, RMUnassignedMessageLi
    public final void addReceivedInboundMessage(long messageId)
    {
       this.receivedInboundMessages.add(messageId);
-      logger.debug("Inbound Sequence: " + this.incomingSequenceId + ", received message no. " + messageId);
+      if (logger.isDebugEnabled())
+         logger.debug("Inbound Sequence: " + this.incomingSequenceId + ", received message no. " + messageId);
    }
    
    public final void addReceivedOutboundMessage(long messageId)
    {
       this.acknowledgedOutboundMessages.add(messageId);
-      logger.debug("Outbound Sequence: " + this.outgoingSequenceId + ", message no. " + messageId + " acknowledged by server");
+      if (logger.isDebugEnabled())
+         logger.debug("Outbound Sequence: " + this.outgoingSequenceId + ", message no. " + messageId + " acknowledged by server");
    }
    
    public final void setOutboundId(String outboundId)
@@ -210,6 +222,10 @@ public final class RMClientSequence implements RMSequence, RMUnassignedMessageLi
       return (this.addressableClient) ? this.backPort.toString() : ANONYMOUS_URI;
    }
 
+   public final void setAcksTo(URI uri) {
+      this.backPort = uri;
+   }
+   
    public final long newMessageNumber()
    {
       // no need for synchronization
@@ -262,6 +278,15 @@ public final class RMClientSequence implements RMSequence, RMUnassignedMessageLi
       catch (Exception e)
       {
          throw new RMException("Unable to terminate WSRM sequence", e);
+      }
+      finally
+      {
+         if (this.backPort != null)
+         {
+            NettyHttpServer server = NettyHttpServerFactory.getNettyHttpServer(backPort.getPort(), RMRequestHandlerFactory.getInstance());
+            NettyCallbackHandler callback = server.getCallback(this.backPort.getPath());
+            server.unregisterCallback(callback);
+         }
       }
    }
    

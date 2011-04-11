@@ -48,7 +48,9 @@ JBOSS_ENDORSED_DIRS="$JBOSS_HOME/lib/endorsed"
 WSTOOLS_CLASSPATH="$WSTOOLS_CLASSPATH:$JAVA_HOME/lib/tools.jar"
 WSTOOLS_CLASSPATH="$WSTOOLS_CLASSPATH:$JBOSS_HOME/client/activation.jar"
 WSTOOLS_CLASSPATH="$WSTOOLS_CLASSPATH:$JBOSS_HOME/client/getopt.jar"
+WSTOOLS_CLASSPATH="$WSTOOLS_CLASSPATH:$JBOSS_HOME/client/netty.jar"
 WSTOOLS_CLASSPATH="$WSTOOLS_CLASSPATH:$JBOSS_HOME/client/wstx.jar"
+WSTOOLS_CLASSPATH="$WSTOOLS_CLASSPATH:$JBOSS_HOME/client/wstx-lgpl.jar"
 WSTOOLS_CLASSPATH="$WSTOOLS_CLASSPATH:$JBOSS_HOME/client/wsdl4j.jar"
 WSTOOLS_CLASSPATH="$WSTOOLS_CLASSPATH:$JBOSS_HOME/client/jbossall-client.jar"
 WSTOOLS_CLASSPATH="$WSTOOLS_CLASSPATH:$JBOSS_HOME/client/log4j.jar"
@@ -58,11 +60,13 @@ WSTOOLS_CLASSPATH="$WSTOOLS_CLASSPATH:$JBOSS_HOME/client/jbossws-spi.jar"
 WSTOOLS_CLASSPATH="$WSTOOLS_CLASSPATH:$JBOSS_HOME/client/jbossws-common.jar"
 WSTOOLS_CLASSPATH="$WSTOOLS_CLASSPATH:$JBOSS_HOME/client/javassist.jar"
 WSTOOLS_CLASSPATH="$WSTOOLS_CLASSPATH:$JBOSS_HOME/client/jboss-xml-binding.jar"
+WSTOOLS_CLASSPATH="$WSTOOLS_CLASSPATH:$JBOSS_HOME/client/resolver.jar"
+WSTOOLS_CLASSPATH="$WSTOOLS_CLASSPATH:$JBOSS_HOME/client/xercesImpl.jar"
+WSTOOLS_CLASSPATH="$WSTOOLS_CLASSPATH:$JBOSS_HOME/client/jbossxb.jar"
 WSTOOLS_CLASSPATH="$WSTOOLS_CLASSPATH:$JBOSS_HOME/client/jbossws-native-client.jar"
 WSTOOLS_CLASSPATH="$WSTOOLS_CLASSPATH:$JBOSS_HOME/client/jbossws-native-core.jar"
-WSTOOLS_CLASSPATH="$WSTOOLS_CLASSPATH:$JBOSS_HOME/client/jbossws-native-jaxws.jar"
-WSTOOLS_CLASSPATH="$WSTOOLS_CLASSPATH:$JBOSS_HOME/client/jbossws-native-jaxrpc.jar"
-WSTOOLS_CLASSPATH="$WSTOOLS_CLASSPATH:$JBOSS_HOME/client/jbossws-native-saaj.jar"
+WSTOOLS_CLASSPATH="$WSTOOLS_CLASSPATH:$JBOSS_HOME/client/jaxrpc-api.jar"
+WSTOOLS_CLASSPATH="$WSTOOLS_CLASSPATH:$JBOSS_HOME/client/saaj-api.jar"
 
 
 # For Cygwin, switch paths to Windows format before running java
@@ -89,9 +93,8 @@ echo ""
 echo "========================================================================="
 echo ""
 
-# Execute the JVM
+# Execute the command
 "$JAVA" $JAVA_OPTS \
    -Djava.endorsed.dirs="$JBOSS_ENDORSED_DIRS" \
-   -Dlog4j.configuration=wstools-log4j.xml \
    -classpath "$WSTOOLS_CLASSPATH" \
    org.jboss.ws.tools.WSTools "$@"

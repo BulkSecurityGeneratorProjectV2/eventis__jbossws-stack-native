@@ -39,8 +39,8 @@ import org.jboss.logging.Logger;
 import org.jboss.ws.Constants;
 import org.jboss.ws.WSException;
 import org.jboss.ws.core.CommonMessageContext;
-import org.jboss.ws.core.binding.BindingException;
 import org.jboss.ws.core.binding.AbstractDeserializerFactory;
+import org.jboss.ws.core.binding.BindingException;
 import org.jboss.ws.core.binding.DeserializerSupport;
 import org.jboss.ws.core.binding.SerializationContext;
 import org.jboss.ws.core.binding.TypeMappingImpl;
@@ -71,6 +71,7 @@ class XMLContent extends SOAPContent
 
    // The well formed XML content of this element.
    private XMLFragment xmlFragment;
+   private Document document = DOMUtils.getOwnerDocument();
 
    protected XMLContent(SOAPContentElement container)
    {
@@ -154,7 +155,9 @@ class XMLContent extends SOAPContent
       QName xmlType = container.getXmlType();
       Class javaType = container.getJavaType();
 
-      log.debug("getObjectValue [xmlType=" + xmlType + ",javaType=" + javaType + "]");
+      boolean debugEnabled = log.isDebugEnabled();
+      if (debugEnabled)
+         log.debug("getObjectValue [xmlType=" + xmlType + ",javaType=" + javaType + "]");
 
       CommonMessageContext msgContext = MessageContextAssociation.peekMessageContext();
       if (msgContext == null)
@@ -217,7 +220,8 @@ class XMLContent extends SOAPContent
                try
                {
                   String contentType = MimeUtils.resolveMimeType(javaType);
-                  log.debug("Adopt DataHandler to " + javaType + ", contentType " + contentType);
+                  if (debugEnabled)
+                     log.debug("Adopt DataHandler to " + javaType + ", contentType " + contentType);
 
                   DataSource ds = new SwapableMemoryDataSource(((DataHandler)obj).getInputStream(), contentType);
                   DataHandler dh = new DataHandler(ds);
@@ -248,7 +252,8 @@ class XMLContent extends SOAPContent
          throw new WSException(e);
       }
 
-      log.debug("objectValue: " + (obj != null ? obj.getClass().getName() : null));
+      if (debugEnabled)
+         log.debug("objectValue: " + (obj != null ? obj.getClass().getName() : null));
 
       return obj;
    }
@@ -308,18 +313,28 @@ class XMLContent extends SOAPContent
       // Remove all child nodes
       container.removeContents();
 
-      // In case of dispatch and provider we use artifical element names
+      // In case of dispatch and provider we use artificial element names
       // These need to be replaced (costly!)
       if (artificalElement)
       {
          container.setElementQNameInternal(contentRootName);
       }
 
-      Document ownerDoc = container.getOwnerDocument();
+      // Process attributes: we copy from the fragment element to the previous container element, after having cleaned the latter
+      // to prevent useless / redundant namespace declarations with multiple prefixes. We also update the prefix of the container
+      // element to ensure proper namespace is configured for it
+      String oldPrefix = container.getPrefix();
+      if (oldPrefix != null)
+      {
+         container.removeNamespaceDeclaration(oldPrefix);
+      }
       DOMUtils.copyAttributes(container, domElement);
+      container.setPrefix(domElement.getPrefix());
 
       SOAPFactoryImpl soapFactory = new SOAPFactoryImpl();
 
+      // Add new child nodes
+      Document ownerDoc = container.getOwnerDocument();
       NodeList nlist = domElement.getChildNodes();
       for (int i = 0; i < nlist.getLength(); i++)
       {
@@ -327,10 +342,29 @@ class XMLContent extends SOAPContent
          short childType = child.getNodeType();
          if (childType == Node.ELEMENT_NODE)
          {
-            SOAPElement soapElement = soapFactory.createElement((Element)child);
-            container.addChildElement(soapElement);
-            if (Constants.NAME_XOP_INCLUDE.equals(qname) || container.isXOPParameter())
-               XOPContext.inlineXOPData(soapElement);
+
+            boolean setOwnerDocument = (DOMUtils.peekOwnerDocument() == null);
+
+            try
+            {
+               if (setOwnerDocument)
+               {                 
+                  DOMUtils.setOwnerDocument(document);
+               }
+               SOAPElement soapElement = soapFactory.createElement((Element)child);
+               container.addChildElement(soapElement);
+               if (Constants.NAME_XOP_INCLUDE.equals(qname) || container.isXOPParameter())
+                  XOPContext.inlineXOPData(soapElement);
+
+            }
+            finally
+            {
+               if (setOwnerDocument)
+               {
+                  DOMUtils.clearThreadLocals();
+               }
+            }
+
          }
          else if (childType == Node.TEXT_NODE)
          {

@@ -22,6 +22,7 @@
 package org.jboss.ws.core.jaxws.client;
 
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.rmi.RemoteException;
 import java.util.ArrayList;
@@ -48,6 +49,7 @@ import org.jboss.ws.WSException;
 import org.jboss.ws.core.StubExt;
 import org.jboss.ws.extensions.wsrm.api.RMProvider;
 import org.jboss.ws.metadata.umdm.EndpointMetaData;
+import org.jboss.ws.metadata.umdm.FeatureAwareEndpointMetaData;
 import org.jboss.ws.metadata.umdm.OperationMetaData;
 import org.jboss.wsf.common.JavaUtils;
 
@@ -91,6 +93,7 @@ public class ClientProxy implements InvocationHandler
       this.stubMethods = new ArrayList(Arrays.asList(BindingProvider.class.getMethods()));
       this.stubMethods.addAll(Arrays.asList(StubExt.class.getMethods()));
       this.stubMethods.addAll(Arrays.asList(RMProvider.class.getMethods()));
+      this.stubMethods.addAll(Arrays.asList(FeatureAwareEndpointMetaData.class.getMethods()));
       this.objectMethods = Arrays.asList(Object.class.getMethods());
    }
 
@@ -102,8 +105,16 @@ public class ClientProxy implements InvocationHandler
       String methodName = method.getName();
       if (stubMethods.contains(method))
       {
-         Method stubMethod = ClientImpl.class.getMethod(methodName, method.getParameterTypes());
-         return stubMethod.invoke(client, args);
+         try
+         {
+            Method stubMethod = ClientImpl.class.getMethod(methodName, method.getParameterTypes());
+            return stubMethod.invoke(client, args);
+         }
+         catch (InvocationTargetException ite) //unwrap the cause and re-throw as is if it's a WebServiceException (spec requirement for getEndpointReference(..) for instance)
+         {
+            Throwable cause = ite.getCause();
+            throw (cause != null && cause instanceof WebServiceException) ? cause : ite;
+         }
       }
 
       // An invocation on proxy's Object class
@@ -160,7 +171,7 @@ public class ClientProxy implements InvocationHandler
    }
 
    private Object invoke(QName opName, Object[] args, Class retType, Map<String, Object> resContext) throws RemoteException
-   {      
+   {
       boolean rmDetected = this.client.getEndpointConfigMetaData().getConfig().getRMMetaData() != null;
       boolean rmActivated = client.getWSRMSequence() != null;
       if (rmDetected && !rmActivated)
@@ -184,7 +195,8 @@ public class ClientProxy implements InvocationHandler
       ResponseImpl response = new ResponseImpl();
       Runnable task = new AsyncRunnable(response, null, opName, args, retType);
 
-      if(log.isDebugEnabled()) log.debug("Schedule task " + ((AsyncRunnable)task).getTaskID().toString());
+      if (log.isDebugEnabled())
+         log.debug("Schedule task " + ((AsyncRunnable)task).getTaskID().toString());
 
       Future future = executor.submit(task);
       response.setFuture(future);
@@ -259,42 +271,50 @@ public class ClientProxy implements InvocationHandler
             Map<String, Object> resContext = response.getContext();
             Object result = invoke(opName, args, retType, resContext);
 
-            if(log.isDebugEnabled()) log.debug("Finished task " + getTaskID().toString()+": " + result);
+            if (log.isDebugEnabled())
+               log.debug("Finished task " + getTaskID().toString() + ": " + result);
 
             response.set(result);
-
-            // Call the handler if available
-            if (handler != null)
-               handler.handleResponse(response);
          }
          catch (Exception ex)
          {
             handleAsynInvokeException(ex);
          }
+         
+         // Call the handler if available
+         if (handler != null)
+            handler.handleResponse(response);
       }
 
-      // 4.18 Conformance (Failed Dispatch.invokeAsync): When an operation is invoked using an invokeAsync
-      // method, an implementation MUST throw a WebServiceException if there is any error in the configuration 
-      // of the Dispatch instance. Errors that occur during the invocation are reported when the client
-      // attempts to retrieve the results of the operation.
+      // 2.3.4.5 Conformance (Asychronous fault cause): An ExecutionException that is thrown by the get method
+      // of Response as a result of a WSDL fault MUST have as its cause the service specific exception mapped
+      // from the WSDL fault, if there is one, otherwise the ProtocolException mapped from the WSDL fault.      
       private void handleAsynInvokeException(Exception ex)
       {
-         String msg = "Cannot dispatch message";
-         log.error(msg, ex);
+         Exception toBeWrapped = ex;
+         if (ex instanceof SOAPFaultException)
+         {
+            // Unwrap the cause if it is an Application Exception, otherwise use a protocol exception
+            Throwable cause = ex.getCause();
+            if (cause instanceof Exception)
+            {
+               // Use unwrapped WebServiceException
+               if (cause instanceof WebServiceException)
+                  ex = (WebServiceException)cause;
 
-         WebServiceException wsex;
-         if (ex instanceof WebServiceException)
-         {
-            wsex = (WebServiceException)ex;
+               // Use application exception if possible.
+               if (((cause instanceof SOAPException) == false) && ((cause instanceof RuntimeException) == false))
+               {
+                  toBeWrapped = (Exception)cause;
+               }
+            }
          }
-         else
-         {
-            wsex = new WebServiceException(msg, ex);
-         }
-         response.setException(wsex);
+
+         response.setException(toBeWrapped);
       }
 
-      public UUID getTaskID() {
+      public UUID getTaskID()
+      {
          return uuid;
       }
    }

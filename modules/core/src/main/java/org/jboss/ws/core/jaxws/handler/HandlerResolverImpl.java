@@ -21,8 +21,6 @@
  */
 package org.jboss.ws.core.jaxws.handler;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -30,8 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import javax.annotation.PostConstruct;
-import javax.annotation.Resource;
+import javax.naming.Context;
 import javax.xml.namespace.QName;
 import javax.xml.ws.handler.Handler;
 import javax.xml.ws.handler.HandlerResolver;
@@ -41,14 +38,18 @@ import javax.xml.ws.http.HTTPBinding;
 import javax.xml.ws.soap.SOAPBinding;
 
 import org.jboss.logging.Logger;
-import org.jboss.util.NotImplementedException;
 import org.jboss.ws.WSException;
 import org.jboss.ws.metadata.umdm.EndpointConfigMetaData;
 import org.jboss.ws.metadata.umdm.HandlerMetaData;
 import org.jboss.ws.metadata.umdm.HandlerMetaDataJAXWS;
+import org.jboss.ws.metadata.umdm.ServerEndpointMetaData;
 import org.jboss.ws.metadata.umdm.ServiceMetaData;
 import org.jboss.wsf.common.handler.GenericHandler;
 import org.jboss.wsf.common.handler.GenericSOAPHandler;
+import org.jboss.wsf.common.injection.InjectionHelper;
+import org.jboss.wsf.spi.deployment.Endpoint;
+import org.jboss.wsf.spi.invocation.EndpointAssociation;
+import org.jboss.wsf.spi.metadata.injection.InjectionsMetaData;
 import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedHandlerMetaData.HandlerType;
 
 /**
@@ -112,7 +113,8 @@ public class HandlerResolverImpl implements HandlerResolver
 
    public List<Handler> getHandlerChain(PortInfo info, HandlerType type)
    {
-      log.debug("getHandlerChain: [type=" + type + ",info=" + info + "]");
+      if (log.isDebugEnabled())
+         log.debug("getHandlerChain: [type=" + type + ",info=" + info + "]");
 
       List<Handler> handlers = new ArrayList<Handler>();
       for (ScopedHandler scopedHandler : getHandlerMap(type))
@@ -125,7 +127,8 @@ public class HandlerResolverImpl implements HandlerResolver
 
    public void initServiceHandlerChain(ServiceMetaData serviceMetaData)
    {
-      log.debug("initServiceHandlerChain: " + serviceMetaData.getServiceName());
+      if (log.isDebugEnabled())
+         log.debug("initServiceHandlerChain: " + serviceMetaData.getServiceName());
 
       // clear all exisisting handler to avoid double registration
       List<ScopedHandler> handlerMap = getHandlerMap(HandlerType.ENDPOINT);
@@ -133,12 +136,13 @@ public class HandlerResolverImpl implements HandlerResolver
 
       ClassLoader classLoader = serviceMetaData.getUnifiedMetaData().getClassLoader();
       for (HandlerMetaData handlerMetaData : serviceMetaData.getHandlerMetaData())
-         addHandler(classLoader, HandlerType.ENDPOINT, handlerMetaData);
+         addHandler(classLoader, HandlerType.ENDPOINT, handlerMetaData, null);
    }
 
    public void initHandlerChain(EndpointConfigMetaData epConfigMetaData, HandlerType type, boolean clearExistingHandlers)
    {
-      log.debug("initHandlerChain: " + type);
+      if (log.isDebugEnabled())
+         log.debug("initHandlerChain: " + type);
 
       List<ScopedHandler> handlerMap = getHandlerMap(type);
 
@@ -146,11 +150,12 @@ public class HandlerResolverImpl implements HandlerResolver
          handlerMap.clear();
 
       ClassLoader classLoader = epConfigMetaData.getEndpointMetaData().getClassLoader();
+      InjectionsMetaData injectionsMD = getInjectionsMetaData(epConfigMetaData);
       for (HandlerMetaData handlerMetaData : epConfigMetaData.getHandlerMetaData(type))
-         addHandler(classLoader, type, handlerMetaData);
+         addHandler(classLoader, type, handlerMetaData, injectionsMD);
    }
 
-   private void addHandler(ClassLoader classLoader, HandlerType type, HandlerMetaData handlerMetaData)
+   private void addHandler(ClassLoader classLoader, HandlerType type, HandlerMetaData handlerMetaData, InjectionsMetaData injections)
    {
       HandlerMetaDataJAXWS jaxwsMetaData = (HandlerMetaDataJAXWS)handlerMetaData;
       String handlerName = jaxwsMetaData.getHandlerName();
@@ -169,11 +174,13 @@ public class HandlerResolverImpl implements HandlerResolver
          if (handler instanceof GenericSOAPHandler)
             ((GenericSOAPHandler)handler).setHeaders(soapHeaders);
 
-         // Inject resources 
-         injectResources(handler);
-
-         // Call @PostConstruct
-         callPostConstruct(handler);
+         if (injections != null)
+         {
+            Endpoint ep = EndpointAssociation.getEndpoint();
+            Context ctx = ep == null ? null : ep.getJNDIContext();
+            InjectionHelper.injectResources(handler, injections, ctx);
+         }
+         InjectionHelper.callPostConstructMethod(handler);
 
          addHandler(jaxwsMetaData, handler, type);
       }
@@ -187,58 +194,10 @@ public class HandlerResolverImpl implements HandlerResolver
       }
    }
 
-   private void injectResources(Handler handler)
-   {
-      ClassLoader ctxLoader = Thread.currentThread().getContextClassLoader();
-      try
-      {
-         ctxLoader.loadClass("javax.annotation.Resource");
-      }
-      catch (Throwable th)
-      {
-         log.debug("Cannot inject resources: " + th.toString());
-         return;
-      }
-
-      Class<? extends Handler> handlerClass = handler.getClass();
-      for (Field field : handlerClass.getFields())
-      {
-         if (field.isAnnotationPresent(Resource.class))
-            throw new NotImplementedException("@Resource not implemented for handler: " + handlerClass.getName());
-      }
-      for (Method method : handlerClass.getMethods())
-      {
-         if (method.isAnnotationPresent(Resource.class))
-            throw new NotImplementedException("@Resource not implemented for handler: " + handlerClass.getName());
-      }
-   }
-
-   private void callPostConstruct(Handler handler) throws Exception
-   {
-      ClassLoader ctxLoader = Thread.currentThread().getContextClassLoader();
-      try
-      {
-         ctxLoader.loadClass("javax.annotation.PostConstruct");
-      }
-      catch (Throwable th)
-      {
-         log.debug("Cannot call post construct: " + th.toString());
-         return;
-      }
-
-      Class<? extends Handler> handlerClass = handler.getClass();
-      for (Method method : handlerClass.getMethods())
-      {
-         if (method.isAnnotationPresent(PostConstruct.class))
-         {
-            method.invoke(handler, new Object[] {});
-         }
-      }
-   }
-
    private boolean addHandler(HandlerMetaDataJAXWS hmd, Handler handler, HandlerType type)
    {
-      log.debug("addHandler: " + hmd);
+      if (log.isDebugEnabled())
+         log.debug("addHandler: " + hmd);
 
       List<ScopedHandler> handlerMap = getHandlerMap(type);
       ScopedHandler scopedHandler = new ScopedHandler(handler);
@@ -335,4 +294,18 @@ public class HandlerResolverImpl implements HandlerResolver
          return match;
       }
    }
+   
+   private InjectionsMetaData getInjectionsMetaData(EndpointConfigMetaData endpointConfigMD)
+   {
+      if (endpointConfigMD.getEndpointMetaData() instanceof ServerEndpointMetaData)
+      {
+         ServerEndpointMetaData endpointMD = ((ServerEndpointMetaData)endpointConfigMD.getEndpointMetaData()); 
+         return endpointMD.getEndpoint().getAttachment(InjectionsMetaData.class);
+      }
+      else
+      {
+         return null;
+      }
+   }
+
 }

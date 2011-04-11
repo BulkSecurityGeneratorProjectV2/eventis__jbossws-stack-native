@@ -21,6 +21,8 @@
  */
 package org.jboss.ws.metadata.umdm;
 
+import java.lang.ref.Reference;
+import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -38,6 +40,7 @@ import java.util.Set;
 
 import javax.jws.soap.SOAPBinding.ParameterStyle;
 import javax.xml.bind.JAXBContext;
+import javax.xml.bind.annotation.XmlElementDecl;
 import javax.xml.namespace.QName;
 import javax.xml.rpc.ParameterMode;
 import javax.xml.ws.WebServiceFeature;
@@ -58,6 +61,7 @@ import org.jboss.ws.core.jaxws.JAXBContextFactory;
 import org.jboss.ws.core.jaxws.JAXBDeserializerFactory;
 import org.jboss.ws.core.jaxws.JAXBSerializerFactory;
 import org.jboss.ws.core.jaxws.client.DispatchBinding;
+import org.jboss.ws.core.jaxws.wsaddressing.NativeEndpointReference;
 import org.jboss.ws.core.soap.Style;
 import org.jboss.ws.core.soap.Use;
 import org.jboss.ws.extensions.wsrm.config.RMConfig;
@@ -72,6 +76,7 @@ import org.jboss.ws.metadata.config.EndpointFeature;
 import org.jboss.ws.metadata.config.JBossWSConfigFactory;
 import org.jboss.wsf.common.JavaUtils;
 import org.jboss.wsf.spi.binding.BindingCustomization;
+import org.jboss.wsf.spi.binding.JAXBBindingCustomization;
 import org.jboss.wsf.spi.deployment.UnifiedVirtualFile;
 import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedPortComponentRefMetaData;
 import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedHandlerMetaData.HandlerType;
@@ -143,6 +148,8 @@ public abstract class EndpointMetaData extends ExtensibleMetaData implements Con
    private FeatureSet features = new FeatureSet();
    // The documentation edfined through the @Documentation annotation
    private String documentation;
+   
+   private NativeEndpointReference epr;
 
    private ConfigObservable configObservable = new ConfigObservable();
 
@@ -151,6 +158,10 @@ public abstract class EndpointMetaData extends ExtensibleMetaData implements Con
    private JAXBContextCache jaxbCache = new JAXBContextCache();
 
    private List<BindingCustomization> bindingCustomization = new ArrayList<BindingCustomization>();
+   
+   EndpointMetaData()
+   {
+   }
 
    public EndpointMetaData(ServiceMetaData service, QName portName, QName portTypeName, Type type)
    {
@@ -176,6 +187,16 @@ public abstract class EndpointMetaData extends ExtensibleMetaData implements Con
    public void setPortName(QName portName)
    {
       this.portName = portName;
+   }
+
+   public NativeEndpointReference getEndpointReference()
+   {
+      return epr;
+   }
+
+   public void setEndpointReference(final NativeEndpointReference epr)
+   {
+      this.epr = epr;
    }
 
    public QName getPortTypeName()
@@ -214,7 +235,7 @@ public abstract class EndpointMetaData extends ExtensibleMetaData implements Con
       if (wsMetaData.isEagerInitialized())
       {
          if (UnifiedMetaData.isFinalRelease() == false)
-            log.warn("Set SEI name after eager initialization", new IllegalStateException());
+            log.warn("Set SEI name after eager initialization");
 
          // reinitialize
          initializeInternal();
@@ -259,7 +280,8 @@ public abstract class EndpointMetaData extends ExtensibleMetaData implements Con
       if (use == null)
       {
          use = Use.getDefaultUse();
-         log.debug("Using default encoding style: " + use);
+         if (log.isDebugEnabled())
+            log.debug("Using default encoding style: " + use);
       }
       return use;
    }
@@ -278,7 +300,8 @@ public abstract class EndpointMetaData extends ExtensibleMetaData implements Con
       if (style == null)
       {
          style = Style.getDefaultStyle();
-         log.debug("Using default style: " + style);
+         if (log.isDebugEnabled())
+            log.debug("Using default style: " + style);
       }
       return style;
    }
@@ -288,7 +311,8 @@ public abstract class EndpointMetaData extends ExtensibleMetaData implements Con
       if (value != null && style != null && !style.equals(value))
          throw new WSException("Mixed styles not supported");
 
-      log.trace("setStyle: " + value);
+      if (log.isTraceEnabled())
+         log.trace("setStyle: " + value);
       this.style = value;
    }
 
@@ -297,7 +321,8 @@ public abstract class EndpointMetaData extends ExtensibleMetaData implements Con
       if (parameterStyle == null)
       {
          parameterStyle = ParameterStyle.WRAPPED;
-         log.debug("Using default parameter style: " + parameterStyle);
+         if (log.isDebugEnabled())
+            log.debug("Using default parameter style: " + parameterStyle);
       }
       return parameterStyle;
    }
@@ -307,7 +332,8 @@ public abstract class EndpointMetaData extends ExtensibleMetaData implements Con
       if (value != null && parameterStyle != null && !parameterStyle.equals(value))
          throw new WSException("Mixed SOAP parameter styles not supported");
 
-      log.debug("setParameterStyle: " + value);
+      if (log.isDebugEnabled())
+         log.debug("setParameterStyle: " + value);
       this.parameterStyle = value;
    }
 
@@ -675,9 +701,9 @@ public abstract class EndpointMetaData extends ExtensibleMetaData implements Con
          if (retParam != null)
             createAccessor(retParam, jaxbCtx);
       }
-      
+
    }
-   
+
    private void eagerInitializeJAXBContextCache()
    {
       //initialize jaxb context cache
@@ -685,13 +711,35 @@ public abstract class EndpointMetaData extends ExtensibleMetaData implements Con
       {
          log.debug("Initializing JAXBContext cache...");
          BindingCustomization bindingCustomization = null;
-         if(this instanceof ServerEndpointMetaData)
+         if (this instanceof ServerEndpointMetaData)
          {
             bindingCustomization = ((ServerEndpointMetaData)this).getEndpoint().getAttachment(BindingCustomization.class);
          }
          try
          {
             Class[] classes = getRegisteredTypes().toArray(new Class[0]);
+            String defaultNS = portTypeName.getNamespaceURI();
+            for (Class<?> clz : classes)
+            {
+               if (clz.getName().endsWith("ObjectFactory"))
+               {
+                  for (Method method : clz.getMethods())
+                  {
+                     XmlElementDecl elementDecl = method.getAnnotation(XmlElementDecl.class);
+                     if (elementDecl != null && XmlElementDecl.GLOBAL.class.equals(elementDecl.scope())
+                           && elementDecl.namespace() != null && elementDecl.namespace().length() > 0)
+                     {
+                        defaultNS = null;
+                     }
+                  }
+               }
+            }
+            if (defaultNS != null)
+            {
+               if (bindingCustomization == null)
+                  bindingCustomization = new JAXBBindingCustomization();
+               bindingCustomization.put("com.sun.xml.bind.defaultNamespaceRemap", defaultNS);
+            }
             JAXBContext context = JAXBContextFactory.newInstance().createContext(classes, bindingCustomization);
             jaxbCache.add(classes, context);
          }
@@ -735,7 +783,8 @@ public abstract class EndpointMetaData extends ExtensibleMetaData implements Con
          {
             CommonBindingProvider provider = (CommonBindingProvider)configurable;
             ((CommonSOAPBinding)provider.getCommonBinding()).setMTOMEnabled(true);
-            log.debug("Enable MTOM on endpoint " + getPortName());
+            if (log.isDebugEnabled())
+               log.debug("Enable MTOM on endpoint " + getPortName());
          }
       }
       else if (configurable instanceof DispatchBinding)
@@ -816,7 +865,8 @@ public abstract class EndpointMetaData extends ExtensibleMetaData implements Con
 
       if (configName.equals(getEndpointConfigMetaData().getConfigName()) == false || configFile.equals(getEndpointConfigMetaData().getConfigFile()) == false)
       {
-         log.debug("Reconfiguration forced, new config is '" + configName + "' file is '" + configFile + "'");
+         if (log.isDebugEnabled())
+            log.debug("Reconfiguration forced, new config is '" + configName + "' file is '" + configFile + "'");
 
          this.configMetaData = createEndpointConfigMetaData(configName, configFile);
          configObservable.doNotify(configName);
@@ -861,7 +911,8 @@ public abstract class EndpointMetaData extends ExtensibleMetaData implements Con
       String configName = toInitialise.getConfigName();
       String configFile = toInitialise.getConfigFile();
 
-      log.debug("Create new config [name=" + configName + ",file=" + configFile + "]");
+      if (log.isDebugEnabled())
+         log.debug("Create new config [name=" + configName + ",file=" + configFile + "]");
 
       JBossWSConfigFactory factory = JBossWSConfigFactory.newInstance();
       List<RMPortConfig> rmPortMetaData = null;
@@ -928,6 +979,7 @@ public abstract class EndpointMetaData extends ExtensibleMetaData implements Con
    class ConfigObservable extends Observable
    {
 
+      private ReferenceQueue<WeakReference<Observer>> queue = new ReferenceQueue<WeakReference<Observer>>();
       private List<WeakReference<Observer>> observer = new ArrayList<WeakReference<Observer>>();
 
       public void doNotify(Object object)
@@ -938,15 +990,17 @@ public abstract class EndpointMetaData extends ExtensibleMetaData implements Con
 
       public synchronized void addObserver(Observer o)
       {
-         observer.add(new WeakReference(o));
+         clearCollected();
+         observer.add(new WeakReference(o, queue));
       }
 
       public synchronized void deleteObserver(Observer o)
       {
+         clearCollected();
          for (WeakReference<Observer> w : observer)
          {
             Observer tmp = w.get();
-            if (tmp.equals(o))
+            if (tmp != null && tmp.equals(o))
             {
                observer.remove(o);
                break;
@@ -962,15 +1016,28 @@ public abstract class EndpointMetaData extends ExtensibleMetaData implements Con
 
       public void notifyObservers(Object arg)
       {
+         clearCollected();
          if (hasChanged())
          {
             for (WeakReference<Observer> w : observer)
             {
                Observer tmp = w.get();
-               tmp.update(this, arg);
-
+               if (tmp != null)
+               {
+                  tmp.update(this, arg);
+               }
             }
          }
+      }
+
+      private void clearCollected()
+      {
+         Reference ref;
+         while ((ref = queue.poll()) != null)
+         {
+            observer.remove(ref);
+         }
+
       }
    }
 

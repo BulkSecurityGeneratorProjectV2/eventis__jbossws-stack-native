@@ -57,7 +57,7 @@ public class ToolsAnnotationMetaDataBuilder
 
    private Class endpoint = null;
 
-   public ToolsAnnotationMetaDataBuilder(ToolsEndpointMetaData tmd, String targetNamespace, String typeNamespace2)
+   public ToolsAnnotationMetaDataBuilder(ToolsEndpointMetaData tmd, String targetNamespace, String typeNamespace)
    {
       this.tmd = tmd;
       this.targetNamespace = targetNamespace;
@@ -75,7 +75,7 @@ public class ToolsAnnotationMetaDataBuilder
    private void generateOperationMetaData()
    {
       //    Generate the Operation Metadata
-      Method[] marr = endpoint.getDeclaredMethods();
+      Method[] marr = endpoint.getMethods();
       if( marr != null)
       {
          int len = Array.getLength(marr);

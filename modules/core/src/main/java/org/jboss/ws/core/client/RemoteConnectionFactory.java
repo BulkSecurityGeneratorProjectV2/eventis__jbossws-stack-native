@@ -40,6 +40,7 @@ public class RemoteConnectionFactory
          throw new IllegalArgumentException("Cannot obtain target address from: " + epInfo);
       
       String key = null;
+      targetAddress = targetAddress.toLowerCase();
       if (targetAddress.startsWith("http"))
          key = RemoteConnection.class.getName() + ".http";
       else if (targetAddress.startsWith("jms"))

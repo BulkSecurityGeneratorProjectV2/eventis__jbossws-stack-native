@@ -161,6 +161,7 @@ public class JavaToXSD implements JavaToXSDIntf
       int index = 0;
       SchemaGrammar[] gs = new SchemaGrammar[locs.size()];
       Iterator<String> it = locs.keySet().iterator();
+      boolean debugEnabled = log.isDebugEnabled();
       while (it.hasNext())
       {
          InputStream in = null;
@@ -171,7 +172,8 @@ public class JavaToXSD implements JavaToXSDIntf
             URL resURL = resolveNamespaceURI(resolver, nsURI);
             URL url = resURL != null ? resURL : orgURL;
             
-            log.debug("Load schema: " + nsURI + "=" + url);
+            if (debugEnabled)
+               log.debug("Load schema: " + nsURI + "=" + url);
             XMLInputSource inputSource = new XMLInputSource(null, url.toExternalForm(), null);
 
             InputSource tmpSrc = resolver.resolveEntity(null, url.toExternalForm());
@@ -224,15 +226,15 @@ public class JavaToXSD implements JavaToXSDIntf
       String resource = (String)resolver.getEntityMap().get(nsURI);
       if (resource != null)
       {
-         ClassLoader loader = Thread.currentThread().getContextClassLoader();
-         url = loader.getResource(resource);
+         ClassLoader loader = SecurityActions.getContextClassLoader();
+         url = SecurityActions.getResource(loader, resource);
          if (url == null)
          {
             if (resource.endsWith(".dtd"))
                resource = "dtd/" + resource;
             else if (resource.endsWith(".xsd"))
                resource = "schema/" + resource;
-            url = loader.getResource(resource);
+            url = SecurityActions.getResource(loader, resource);
          }
       }
 

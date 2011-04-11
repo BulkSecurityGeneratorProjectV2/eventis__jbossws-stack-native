@@ -89,20 +89,7 @@ public class SOAPHeaderImpl extends SOAPElementImpl implements SOAPHeader
       if (name == null)
          throw new SOAPException("Invalid SOAPHeaderElement name: " + name);
 
-      if (name instanceof NameImpl)
-      {
-         return addHeaderElement(((NameImpl)name).toQName());
-      }
-      else
-      {
-         QName qname;
-         if (name.getPrefix() != null)
-            qname = new QName(name.getURI(), name.getLocalName(), name.getPrefix());
-         else
-            qname = new QName(name.getURI(), name.getLocalName());
-         return addHeaderElement(qname);
-      }
-//      return addHeaderElement(((NameImpl)name).toQName());
+      return addHeaderElement(((NameImpl)name).toQName());
    }
 
    public SOAPHeaderElement addHeaderElement(QName qname) throws SOAPException

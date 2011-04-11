@@ -1,7 +1,19 @@
 #!/bin/sh
 
-DIRNAME=`dirname $0`
-PROGNAME=`basename $0`
+# Extract the directory and the program name
+# takes care of symlinks
+PRG="$0"
+while [ -h "$PRG" ] ; do
+  ls=`ls -ld "$PRG"`
+  link=`expr "$ls" : '.*-> \(.*\)$'`
+  if expr "$link" : '/.*' > /dev/null; then
+    PRG="$link"
+  else
+    PRG="`dirname "$PRG"`/$link"
+  fi
+done
+DIRNAME=`dirname "$PRG"`
+PROGNAME=`basename "$PRG"`
 
 if [ $# -eq 0 ]; then
     echo "$PROGNAME is a command line tool that invokes a JBossWS JAX-WS Web Service client."
@@ -65,23 +77,29 @@ JBOSS_ENDORSED_DIRS="$JBOSS_HOME/lib/endorsed"
 # Setup the tool classpath
 WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/activation.jar"
 WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/javassist.jar"
+WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/jaxws-api.jar"
+WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/jsr181-api.jar"
 WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/jaxb-api.jar"
 WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/jaxb-impl.jar"
 WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/jbossall-client.jar"
 WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/jboss-xml-binding.jar"
+WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/resolver.jar"
+WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/xercesImpl.jar"
+WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/jbossxb.jar"
 WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/jbossws-common.jar"
 WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/jbossws-native-client.jar"
 WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/jbossws-native-core.jar"
-WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/jbossws-native-jaxrpc.jar"
-WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/jbossws-native-jaxws.jar"
-WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/jbossws-native-jaxws-ext.jar"
-WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/jbossws-native-saaj.jar"
+WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/jbossws-native-services.jar"
+WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/jaxrpc-api.jar"
+WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/saaj-api.jar"
+WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/jbossws-api.jar"
 WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/jbossws-spi.jar"
+WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/FastInfoset.jar"
 WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/log4j.jar"
 WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/mail.jar"
-WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/policy.jar"
+WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/netty.jar"
+WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/wscommons-policy.jar"
 WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/stax-api.jar"
-WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/xmlsec.jar"
 WSRUNCLIENT_CLASSPATH="$WSRUNCLIENT_CLASSPATH:$JBOSS_HOME/client/wsdl4j.jar"
 
 # For Cygwin, switch paths to Windows format before running java
@@ -92,9 +110,8 @@ if $cygwin; then
     JBOSS_ENDORSED_DIRS=`cygpath --path --windows "$JBOSS_ENDORSED_DIRS"`
 fi
 
-# Execute the JVM
+# Execute the command
 "$JAVA" $JAVA_OPTS \
    -Djava.endorsed.dirs="$JBOSS_ENDORSED_DIRS" \
-   -Dlog4j.configuration=wstools-log4j.xml \
    -classpath "$WSRUNCLIENT_CLASSPATH" \
    $args

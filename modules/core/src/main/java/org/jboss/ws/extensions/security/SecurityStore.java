@@ -47,11 +47,17 @@ import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Properties;
 import java.util.StringTokenizer;
 
 import org.jboss.logging.Logger;
 import org.jboss.ws.extensions.security.exception.FailedAuthenticationException;
 import org.jboss.ws.extensions.security.exception.WSSecurityException;
+import org.jboss.ws.metadata.wsse.SecurityDomain;
+import org.jboss.ws.metadata.wsse.WSSecurityConfiguration;
+import org.jboss.wsf.spi.security.JAASSecurityDomainAdaptor;
+import org.jboss.wsf.spi.security.JAASSecurityDomainAdaptorResolver;
+import org.jboss.wsf.spi.util.ServiceLoader;
 
 /**
  * <code>SecurityStore</code> holds and loads the keystore and truststore required for encyption and signing.
@@ -74,30 +80,67 @@ public class SecurityStore
 
    private HashMap<String, String> keyPasswords;
    
+   private JAASSecurityDomainAdaptor sd;
+   
+   private String securityDomainAuthToken;
+   
+   private boolean useSecurityDomainAliases;
+   
    public SecurityStore() throws WSSecurityException
    {
-      this(null, null, null, null, null, null, null);
+      loadKeyStore(null, null, null);
+      loadTrustStore(null, null, null);
    }
-
-   public SecurityStore(URL keyStoreURL, String keyStoreType, String keyStorePassword, HashMap<String, String> keyPasswords) throws WSSecurityException
+   
+   public SecurityStore(WSSecurityConfiguration conf) throws WSSecurityException
    {
-      loadKeyStore(keyStoreURL, keyStoreType, keyStorePassword);
-      loadTrustStore(keyStoreURL, keyStoreType, keyStorePassword);
-      this.keyPasswords = keyPasswords;
-   }
+      if (conf == null)
+      {
+         return;
+      }
 
-   public SecurityStore(URL keyStoreURL, String keyStoreType, String keyStorePassword, HashMap<String, String> keyPasswords, URL trustStoreURL, String trustStoreType, String trustStorePassword)
-         throws WSSecurityException
-   {
-      loadKeyStore(keyStoreURL, keyStoreType, keyStorePassword);
-      loadTrustStore(trustStoreURL, trustStoreType, trustStorePassword);
-      this.keyPasswords = keyPasswords;
-   }
+      SecurityDomain securityDomainConf = conf.getSecurityDomain();
+      if (securityDomainConf != null)
+      {
+         JAASSecurityDomainAdaptorResolver sdResolver = (JAASSecurityDomainAdaptorResolver)ServiceLoader.loadService(JAASSecurityDomainAdaptorResolver.class.getName(),
+               null);
+         if (sdResolver == null)
+         {
+            throw new WSSecurityException("Could not get a jaas security domain resolver implementation implementing " + JAASSecurityDomainAdaptorResolver.class
+                  + "; this is container specific, so please check your classpath is properly set if running on client side.");
+         }
+         try
+         {
+            sd = sdResolver.lookup(securityDomainConf.getJndi());
+         }
+         catch (Exception e)
+         {
+            throw new WSSecurityException("JNDI failure handling " + securityDomainConf.getJndi(), e);
+         }
+         // if we reached this point, means we have a JNDI name pointing to a valid JAAS Security Domain
+         keyStore = sd.getKeyStore();
+         trustStore = sd.getTrustStore();
+         securityDomainAuthToken = securityDomainConf.getAuthToken();
+         useSecurityDomainAliases = securityDomainConf.isUseSecurityDomainAliases();
+      }
+      else
+      {
+         URL keyStoreURL = conf.getKeyStoreURL();
+         String keyStoreType = conf.getKeyStoreType();
+         String keyStorePassword = conf.getKeyStorePassword();
+         URL trustStoreURL = conf.getTrustStoreURL();
+         String trustStoreType = conf.getTrustStoreType();
+         String trustStorePassword = conf.getTrustStorePassword();
 
+         loadKeyStore(keyStoreURL, keyStoreType, keyStorePassword);
+         loadTrustStore(trustStoreURL, trustStoreType, trustStorePassword);
+      }
+   }
+   
    private void loadKeyStore(URL keyStoreURL, String keyStoreType, String keyStorePassword) throws WSSecurityException
    {
       if (keyStorePassword == null)
-         keyStorePassword = System.getProperty("org.jboss.ws.wsse.keyStorePassword");
+         keyStorePassword = SecurityActions.getSystemProperty("org.jboss.ws.wsse.keyStorePassword");
 
       keyStore = loadStore("org.jboss.ws.wsse.keyStore", "Keystore", keyStoreURL, keyStoreType, keyStorePassword);
       this.keyStorePassword = keyStorePassword;
@@ -106,7 +149,7 @@ public class SecurityStore
    private void loadTrustStore(URL trustStoreURL, String trustStoreType, String trustStorePassword) throws WSSecurityException
    {
       if (trustStorePassword == null)
-         trustStorePassword = System.getProperty("org.jboss.ws.wsse.trustStorePassword");
+         trustStorePassword = SecurityActions.getSystemProperty("org.jboss.ws.wsse.trustStorePassword");
 
       trustStore = loadStore("org.jboss.ws.wsse.trustStore", "Truststore", trustStoreURL, trustStoreType, trustStorePassword);
       this.trustStorePassword = trustStorePassword;
@@ -116,7 +159,7 @@ public class SecurityStore
    {
       if (storeURL == null)
       {
-         String defaultStore = System.getProperty(property);
+         String defaultStore = SecurityActions.getSystemProperty(property);
          if (defaultStore == null)
          {
             return null;
@@ -134,7 +177,7 @@ public class SecurityStore
       }
 
       if (storeType == null)
-         storeType = System.getProperty(property + "Type");
+         storeType = SecurityActions.getSystemProperty(property + "Type");
       if (storeType == null)
          storeType = "jks";
 
@@ -142,7 +185,8 @@ public class SecurityStore
       InputStream stream = null;
       try
       {
-         log.debug("loadStore: " + storeURL);
+         if (log.isDebugEnabled())
+            log.debug("loadStore: " + storeURL);
          stream = storeURL.openStream();
          if (stream == null)
             throw new WSSecurityException("Cannot load store from: " + storeURL);
@@ -225,7 +269,9 @@ public class SecurityStore
 
    private String execPasswordCmd(String keyStorePasswordCmd) throws WSSecurityException
    {
-      log.debug("Executing cmd: " + keyStorePasswordCmd);
+      boolean debugEnabled = log.isDebugEnabled();
+      if (debugEnabled)
+         log.debug("Executing cmd: " + keyStorePasswordCmd);
       try
       {
          String password = null;
@@ -249,9 +295,11 @@ public class SecurityStore
                log.error(line);
                line = reader.readLine();
             }
+            reader.close();
             stderr.close();
          }
-         log.debug("Command exited with: " + status);
+         if (debugEnabled)
+            log.debug("Command exited with: " + status);
          return password;
       }
       catch (Exception e)
@@ -271,10 +319,11 @@ public class SecurityStore
          classname = keyStorePasswordCmd.substring(0, colon);
          ctorArg = keyStorePasswordCmd.substring(colon + 1);
       }
-      log.debug("Loading class: " + classname + ", ctorArg=" + ctorArg);
+      if (log.isDebugEnabled())
+         log.debug("Loading class: " + classname + ", ctorArg=" + ctorArg);
       try
       {
-         ClassLoader loader = Thread.currentThread().getContextClassLoader();
+         ClassLoader loader = SecurityActions.getContextClassLoader();
          Class c = loader.loadClass(classname);
          Object instance = null;
          if (ctorArg != null)
@@ -326,7 +375,7 @@ public class SecurityStore
       return identifier;
    }
 
-   public X509Certificate getCertificate(String alias) throws WSSecurityException
+   public X509Certificate getCertificate(String alias, String securityDomainAliasLabel) throws WSSecurityException
    {
       if (keyStore == null)
       {
@@ -336,7 +385,7 @@ public class SecurityStore
       X509Certificate cert;
       try
       {
-         cert = (X509Certificate)keyStore.getCertificate(alias);
+         cert = (X509Certificate)keyStore.getCertificate(resolveAlias(alias, securityDomainAliasLabel));
       }
       catch (Exception e)
       {
@@ -347,6 +396,16 @@ public class SecurityStore
          throw new WSSecurityException("Certificate (" + alias + ") not in keystore");
 
       return cert;
+   }
+   
+   private String resolveAlias(String alias, String label)
+   {
+      if (useSecurityDomainAliases && label != null)
+      {
+         Properties props = sd.getAdditionalOptions();
+         return props.getProperty(label);
+      }
+      return alias;
    }
    
    public X509Certificate getCertificateByPublicKey(PublicKey key) throws WSSecurityException
@@ -448,20 +507,27 @@ public class SecurityStore
       return null;
    }
 
-   public PrivateKey getPrivateKey(String alias) throws WSSecurityException
+   public PrivateKey getPrivateKey(String alias, String securityDomainAliasLabel) throws WSSecurityException
    {
       if (keyStore == null)
       {
          throw new WSSecurityException("KeyStore not set.");
       }
-
+      
       PrivateKey key;
       try
       {
-         String password = keyStorePassword;
-         if (keyPasswords != null && keyPasswords.containsKey(alias))
-             password = keyPasswords.get(alias);
-         key = (PrivateKey)keyStore.getKey(alias, decryptPassword(password).toCharArray());
+         if (sd == null)
+         {
+            String password = keyStorePassword;
+            if (keyPasswords != null && keyPasswords.containsKey(alias))
+                password = keyPasswords.get(alias);
+            key = (PrivateKey)keyStore.getKey(alias, decryptPassword(password).toCharArray());
+         }
+         else
+         {
+            key = (PrivateKey)sd.getKey(resolveAlias(alias, securityDomainAliasLabel), securityDomainAuthToken);
+         }
       }
       catch (Exception e)
       {
@@ -484,7 +550,7 @@ public class SecurityStore
       try
       {
          String alias = keyStore.getCertificateAlias(cert);
-         return getPrivateKey(alias);
+         return getPrivateKey(alias, null);
       }
       catch (Exception e)
       {

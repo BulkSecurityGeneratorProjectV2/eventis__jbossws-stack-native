@@ -27,16 +27,20 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Date;
 
-import javax.management.ObjectName;
+import javax.jms.MessageConsumer;
+import javax.jms.Queue;
+import javax.jms.QueueConnection;
+import javax.jms.QueueConnectionFactory;
+import javax.jms.QueueSession;
+import javax.jms.Session;
+import javax.jms.TextMessage;
+import javax.naming.InitialContext;
 
 import junit.framework.Test;
 
-import org.jboss.wsf.common.DOMUtils;
-import org.jboss.wsf.common.ObjectNameFactory;
 import org.jboss.wsf.test.JBossWSTest;
+import org.jboss.wsf.test.JBossWSTestHelper;
 import org.jboss.wsf.test.JBossWSTestSetup;
-import org.w3c.dom.Element;
-import org.w3c.dom.NodeList;
 
 /**
  * Invokes the DAR JMS client
@@ -50,13 +54,13 @@ public class JMSClientTestCase extends JBossWSTest
    
    public static Test suite()
    {
-      return new JBossWSTestSetup(JMSClientTestCase.class, "jaxws-samples-dar-jms-client.sar,jaxws-samples-dar-jms.jar");
+      //TODO: replace isHornetQAvailable call with JBossWSTestHelper.isTargetJBoss6() once AS 6 M3 is out and hence M2 is not supported anymore
+      return new JBossWSTestSetup(JMSClientTestCase.class, JBossWSTestHelper.isTargetJBoss6() ? "jaxws-samples-dar-jms-client-test-as6.sar,jaxws-samples-dar-jms.jar" : "jaxws-samples-dar-jms-client-test.sar,jaxws-samples-dar-jms.jar");
    }
    
    public void test() throws Exception
    {
       String url = "http://" + getServerHost() + ":8080/dar-jms-client/JMSClient";
-      int count = getMessageCount("DarResponseQueue");
       Date start = new Date();
       HttpURLConnection connection = (HttpURLConnection)new URL(url).openConnection();
       int responseCode = connection.getResponseCode();
@@ -73,25 +77,18 @@ public class JMSClientTestCase extends JBossWSTest
       assertTrue(buffer.toString().contains("Request message sent, doing something interesting in the mean time... ;-) "));
       Date stop = new Date();
       assertTrue(stop.getTime() - start.getTime() < TEST_RUN_TIME / 2);
-      Thread.sleep(TEST_RUN_TIME);
-      assertEquals(count + 1, getMessageCount("DarResponseQueue"));
-   }
-   
-   private int getMessageCount(String queue) throws Exception
-   {
-      ObjectName oname = ObjectNameFactory.create("jboss.mq.destination:service=Queue,name=" + queue);
-      String result = (String)getServer().invoke(oname, "listMessageCounter", null, null);
-      Element table = DOMUtils.parse(result);
-      NodeList ths = table.getFirstChild().getChildNodes();
-      int p = -1;
-      for (int i=0; i<ths.getLength(); i++)
-      {
-         if (ths.item(i).getTextContent().equalsIgnoreCase("Count"))
-            p = i;
-      }
-      if (p == -1)
-         throw new Exception("Cannot read the queue message count!");
-      String count = table.getLastChild().getChildNodes().item(p).getTextContent();
-      return Integer.parseInt(count);
+      
+      //receive the message
+      InitialContext context = new InitialContext();
+      QueueConnectionFactory connectionFactory = (QueueConnectionFactory)context.lookup("ConnectionFactory");
+      QueueConnection con = connectionFactory.createQueueConnection();
+      QueueSession session = con.createQueueSession(false, Session.AUTO_ACKNOWLEDGE);
+      Queue resQueue = (Queue)context.lookup("queue/DarResponseQueue");
+      con.start();
+      MessageConsumer consumer = session.createConsumer(resQueue);
+      TextMessage textMessage = (TextMessage)consumer.receive(TEST_RUN_TIME);
+      String result = textMessage.getText();
+      assertTrue(result != null);
+      con.stop();
    }
 }

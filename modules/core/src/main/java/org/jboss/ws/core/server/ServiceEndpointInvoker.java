@@ -25,9 +25,11 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.util.HashMap;
+import java.util.Map;
 
 import javax.activation.DataHandler;
 import javax.xml.namespace.QName;
+import javax.xml.rpc.ParameterMode;
 import javax.xml.rpc.server.ServiceLifecycle;
 import javax.xml.rpc.server.ServletEndpointContext;
 import javax.xml.soap.Name;
@@ -35,6 +37,7 @@ import javax.xml.soap.SOAPBodyElement;
 import javax.xml.soap.SOAPException;
 import javax.xml.soap.SOAPHeader;
 import javax.xml.ws.WebServiceContext;
+import javax.xml.ws.WebServiceException;
 import javax.xml.ws.handler.MessageContext;
 import javax.xml.ws.http.HTTPBinding;
 
@@ -64,6 +67,7 @@ import org.jboss.ws.extensions.wsrm.RMConstant;
 import org.jboss.ws.extensions.xop.XOPContext;
 import org.jboss.ws.metadata.umdm.EndpointMetaData;
 import org.jboss.ws.metadata.umdm.OperationMetaData;
+import org.jboss.ws.metadata.umdm.ParameterMetaData;
 import org.jboss.ws.metadata.umdm.ServerEndpointMetaData;
 import org.jboss.wsf.common.JavaUtils;
 import org.jboss.wsf.spi.SPIProvider;
@@ -165,6 +169,9 @@ public class ServiceEndpointInvoker
          CommonBinding binding = bindingProvider.getCommonBinding();
          binding.setHeaderSource(delegate);
 
+         if (binding instanceof CommonSOAPBinding)
+            XOPContext.setMTOMEnabled(((CommonSOAPBinding)binding).isMTOMEnabled());
+         
          // call the request handler chain
          boolean handlersPass = callRequestHandlerChain(sepMetaData, handlerType[0]);
 
@@ -209,6 +216,21 @@ public class ServiceEndpointInvoker
                   reqMessage = msgContext.getMessageAbstraction();
                   sepInv = binding.unbindRequestMessage(opMetaData, reqMessage);
                }
+               //JBWS-2969:check if the RPC/Lit input paramter is null
+               if (opMetaData.getEndpointMetaData().getType() != EndpointMetaData.Type.JAXRPC
+                     && opMetaData.isRPCLiteral() && sepInv.getRequestParamNames() != null)
+               {  
+                  
+                  for (QName qname : sepInv.getRequestParamNames())
+                  {
+                     ParameterMetaData paramMetaData = opMetaData.getParameter(qname);
+                     if ((paramMetaData.getMode().equals(ParameterMode.IN) || paramMetaData.getMode().equals(ParameterMode.INOUT)) && sepInv.getRequestParamValue(qname) == null)
+                     {
+                        throw new WebServiceException("The RPC/Literal Operation [" + opMetaData.getQName()
+                              + "] parameters can not be null");
+                     }
+                  }
+               }
 
                // Invoke an instance of the SEI implementation bean 
                Invocation inv = setupInvocation(endpoint, sepInv, invContext);
@@ -238,10 +260,7 @@ public class ServiceEndpointInvoker
 
             // Set the required outbound context properties
             setOutboundContextProperties();
-
-            if (binding instanceof CommonSOAPBinding)
-               XOPContext.setMTOMEnabled(((CommonSOAPBinding)binding).isMTOMEnabled());
-
+               
             // Bind the response message
             MessageAbstraction resMessage = binding.bindResponseMessage(opMetaData, sepInv);
             msgContext.setMessageAbstraction(resMessage);
@@ -306,7 +325,8 @@ public class ServiceEndpointInvoker
       CommonMessageContext msgContext = MessageContextAssociation.peekMessageContext();
       if (msgContext instanceof SOAPMessageContextJAXWS)
       {
-         if (ep.getService().getDeployment().getType() == DeploymentType.JAXWS_JSE)
+         final DeploymentType deploymentType = ep.getService().getDeployment().getType(); 
+         if (DeploymentType.JAXWS_JSE == deploymentType)
          {
             if (msgContext.get(MessageContext.SERVLET_REQUEST) != null)
             {
@@ -317,6 +337,11 @@ public class ServiceEndpointInvoker
             {
                log.warn("Cannot provide WebServiceContext, since the current MessageContext does not provide a ServletRequest");
             }
+         }
+         else if (DeploymentType.JAXWS_EJB3 == deploymentType)
+         {
+            WebServiceContext wsContext = contextFactory.newWebServiceContext(InvocationType.JAXWS_EJB3, (SOAPMessageContextJAXWS)msgContext);
+            invContext.addAttachment(WebServiceContext.class, wsContext);
          }
          invContext.addAttachment(javax.xml.ws.handler.MessageContext.class, msgContext);
       }
@@ -335,8 +360,34 @@ public class ServiceEndpointInvoker
       Invocation wsInv = new DelegatingInvocation();
       wsInv.setInvocationContext(invContext);
       wsInv.setJavaMethod(getImplMethod(endpoint, epInv));
+      wsInv.getInvocationContext().setTargetBean(getEndpointInstance());
 
       return wsInv;
+   }
+   
+   // JBWS-2486 - Only one webservice endpoint instance can be created!
+   private Object getEndpointInstance()
+   {
+      synchronized(endpoint) 
+      {
+         Object endpointImpl = endpoint.getAttachment(Object.class);
+         if (endpointImpl == null)
+         {
+            try
+            {
+               // create endpoint instance
+               final Class<?> endpointImplClass = endpoint.getTargetBeanClass();
+               endpointImpl = endpointImplClass.newInstance();
+               endpoint.addAttachment(Object.class, endpointImpl);
+            }
+            catch (Exception ex)
+            {
+               throw new IllegalStateException("Cannot create endpoint instance: ", ex);
+            }
+         }
+
+         return endpointImpl;
+      }
    }
 
    protected Method getImplMethod(Endpoint endpoint, EndpointInvocation sepInv) throws ClassNotFoundException, NoSuchMethodException
@@ -394,8 +445,19 @@ public class ServiceEndpointInvoker
       CommonMessageContext msgContext = MessageContextAssociation.peekMessageContext();
       if (msgContext instanceof MessageContextJAXWS)
       {
+         Map<String, DataHandler> outboundAttachments = (Map<String, DataHandler>)msgContext.get(MessageContextJAXWS.OUTBOUND_MESSAGE_ATTACHMENTS);
+         Map<String, DataHandler> newAttachments = new HashMap<String, DataHandler>(); // to protect against attacks from endpoint
+         
          // Map of attachments to a message for the outbound message, key is the MIME Content-ID, value is a DataHandler
-         msgContext.put(MessageContextJAXWS.OUTBOUND_MESSAGE_ATTACHMENTS, new HashMap<String, DataHandler>());
+         msgContext.put(MessageContextJAXWS.OUTBOUND_MESSAGE_ATTACHMENTS, newAttachments);
+         
+         if (outboundAttachments != null)
+         {
+            for (final String key : outboundAttachments.keySet())
+            {
+               newAttachments.put(key, outboundAttachments.get(key));
+            }
+         }
       }
    }
 

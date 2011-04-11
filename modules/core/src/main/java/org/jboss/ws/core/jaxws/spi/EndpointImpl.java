@@ -21,22 +21,6 @@
  */
 package org.jboss.ws.core.jaxws.spi;
 
-import org.jboss.logging.Logger;
-import org.jboss.util.NotImplementedException;
-import org.jboss.ws.core.jaxws.binding.BindingProviderImpl;
-import org.jboss.wsf.spi.SPIProvider;
-import org.jboss.wsf.spi.SPIProviderResolver;
-import org.jboss.wsf.spi.http.HttpContext;
-import org.jboss.wsf.spi.http.HttpServer;
-import org.jboss.wsf.spi.http.HttpServerFactory;
-import org.w3c.dom.Element;
-
-import javax.xml.transform.Source;
-import javax.xml.ws.Binding;
-import javax.xml.ws.BindingProvider;
-import javax.xml.ws.Endpoint21;
-import javax.xml.ws.EndpointReference;
-import javax.xml.ws.WebServicePermission;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashMap;
@@ -45,50 +29,76 @@ import java.util.Map;
 import java.util.StringTokenizer;
 import java.util.concurrent.Executor;
 
+import javax.xml.transform.Source;
+import javax.xml.ws.Binding;
+import javax.xml.ws.Endpoint;
+import javax.xml.ws.EndpointReference;
+import javax.xml.ws.WebServiceException;
+import javax.xml.ws.WebServiceFeature;
+import javax.xml.ws.WebServicePermission;
+import javax.xml.ws.http.HTTPBinding;
+import javax.xml.ws.wsaddressing.W3CEndpointReference;
+import javax.xml.ws.wsaddressing.W3CEndpointReferenceBuilder;
+
+import org.jboss.logging.Logger;
+import org.jboss.ws.core.jaxws.binding.BindingProviderImpl;
+import org.jboss.ws.core.jaxws.wsaddressing.EndpointReferenceUtil;
+import org.jboss.wsf.spi.SPIProvider;
+import org.jboss.wsf.spi.SPIProviderResolver;
+import org.jboss.wsf.spi.deployment.Deployment;
+import org.jboss.ws.core.jaxws.spi.http.HttpContext;
+import org.jboss.ws.core.jaxws.spi.http.HttpServer;
+import org.jboss.ws.core.jaxws.spi.http.NettyHttpServerFactory;
+import org.jboss.wsf.spi.management.ServerConfig;
+import org.jboss.wsf.spi.management.ServerConfigFactory;
+import org.w3c.dom.Element;
+
 /**
  * A Web service endpoint implementation.
  *  
- * @author Thomas.Diesler@jboss.com
- * @since 07-Jul-2006
+ * @author <a href="mailto:tdiesler@redhat.com">Thomas Diesler</a>
+ * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
-public class EndpointImpl extends Endpoint21
+public class EndpointImpl extends Endpoint
 {
-   // provide logging
-   private final Logger log = Logger.getLogger(EndpointImpl.class);
 
-   // The permission to publish an endpoint
+   private static final Logger log = Logger.getLogger(EndpointImpl.class);
    private static final WebServicePermission ENDPOINT_PUBLISH_PERMISSION = new WebServicePermission("publishEndpoint");
 
    private Object implementor;
    private Executor executor;
+   private WebServiceFeature[] features; // TODO: use features
    private List<Source> metadata;
-   private BindingProvider bindingProvider;
+   private BindingProviderImpl bindingProvider;
    private Map<String, Object> properties = new HashMap<String, Object>();
    private HttpContext serverContext;
    private boolean isPublished;
    private boolean isDestroyed;
+   private URI address;
+   private Deployment dep;
 
-   public EndpointImpl(String bindingId, Object implementor)
+   public EndpointImpl(String bindingId, Object implementor, WebServiceFeature[] features)
    {
-      log.debug("new EndpointImpl(bindingId=" + bindingId + ",implementor=" + implementor + ")");
-
       if (implementor == null)
+      {
          throw new IllegalArgumentException("Implementor cannot be null");
+      }
 
       this.implementor = implementor;
       this.bindingProvider = new BindingProviderImpl(bindingId);
+      this.features = features;
    }
 
    @Override
    public Binding getBinding()
    {
-      return bindingProvider.getBinding();
+      return this.bindingProvider.getBinding();
    }
 
    @Override
    public Object getImplementor()
    {
-      return implementor;
+      return this.implementor;
    }
 
    /**
@@ -99,34 +109,27 @@ public class EndpointImpl extends Endpoint21
     * @param address specifying the address to use. The address must be compatible with the binding specified at the time the endpoint was created.
     */
    @Override
-   public void publish(String address)
+   public void publish(final String addr)
    {
-      log.debug("publish: " + address);
+      log.debug("publish: " + addr);
 
-      URI addrURI;
       try
       {
-         addrURI = new URI(address);
+         this.address = new URI(addr);
       }
       catch (URISyntaxException e)
       {
-         throw new IllegalArgumentException("Invalid address: " + address);
+         throw new IllegalArgumentException("Invalid address: " + addr);
       }
 
       // Check with the security manger
-      checkPublishEndpointPermission();
+      this.checkPublishEndpointPermission();
 
-      // Create and start the HTTP server
-      SPIProvider spiProvider = SPIProviderResolver.getInstance().getProvider();
-      HttpServer httpServer = spiProvider.getSPI(HttpServerFactory.class).getHttpServer();
-      httpServer.setProperties(properties);
-      httpServer.start();
+      // Get HTTP server
+      final HttpServer httpServer = NettyHttpServerFactory.getHttpServer();
+      final HttpContext context = httpServer.createContext(this.getContextRoot());
 
-      String path = addrURI.getPath();
-      String contextRoot = "/" + new StringTokenizer(path, "/").nextToken();
-      HttpContext context = httpServer.createContext(contextRoot);
-
-      publish(context);
+      this.publish(context);
    }
 
    /**
@@ -139,7 +142,11 @@ public class EndpointImpl extends Endpoint21
    @Override
    public void publish(Object context)
    {
-      log.debug("publish: " + context);
+      if (context == null)
+         throw new IllegalArgumentException("Null context");
+      
+      if (log.isDebugEnabled())
+         log.debug("publishing endpoint " + this + " to " + context);
 
       if (isDestroyed)
          throw new IllegalStateException("Endpoint already destroyed");
@@ -147,30 +154,38 @@ public class EndpointImpl extends Endpoint21
       // Check with the security manger
       checkPublishEndpointPermission();
 
-      /* Check if we are standalone
-      boolean isStandalone;
-      try
-      {
-         SPIProvider spiProvider = SPIProviderResolver.getInstance().getProvider();
-         spiProvider.getSPI(ServerConfigFactory.class).getServerConfig();
-         isStandalone = false;
-      }
-      catch (Exception ex)
-      {
-         // ignore, there should be no ServerConfigFactory in VM
-         isStandalone = true;
-      }
-
-      if (isStandalone == false)
-         throw new IllegalStateException("Cannot publish endpoint from within server");
-      */
-
       if (context instanceof HttpContext)
       {
-         serverContext = (HttpContext)context;
-         HttpServer httpServer = serverContext.getHttpServer();
-         httpServer.publish(serverContext, this);
-         isPublished = true;
+         this.serverContext = (HttpContext)context;
+         if (this.address == null)
+         {
+            this.address = getAddressFromConfigAndContext(serverContext); // TODO: is it necessary?
+         }
+         HttpServer httpServer = this.serverContext.getHttpServer();
+         httpServer.publish(this.serverContext, this);
+         this.isPublished = true;
+      }
+      else
+      {
+         throw new UnsupportedOperationException("Cannot handle contexts of type: " + context);
+      }
+   }
+   
+   private static URI getAddressFromConfigAndContext(HttpContext context)
+   {
+      try
+      {
+         SPIProvider provider = SPIProviderResolver.getInstance().getProvider();
+         ServerConfigFactory spi = provider.getSPI(ServerConfigFactory.class);
+         ServerConfig serverConfig = spi.getServerConfig();
+         String host = serverConfig.getWebServiceHost();
+         int port = serverConfig.getWebServicePort();
+         String hostAndPort = host + (port > 0 ? ":" + port : ""); 
+         return new URI("http://" + hostAndPort + context.getContextRoot());
+      }
+      catch (URISyntaxException e)
+      {
+         throw new WebServiceException("Error while getting endpoint address from context!", e);
       }
    }
 
@@ -202,45 +217,45 @@ public class EndpointImpl extends Endpoint21
    @Override
    public boolean isPublished()
    {
-      return isPublished;
+      return this.isPublished;
    }
 
    @Override
    public List<Source> getMetadata()
    {
-      return metadata;
+      return this.metadata;
    }
 
    @Override
-   public void setMetadata(List<Source> list)
+   public void setMetadata(final List<Source> list)
    {
-      log.info("Ignore metadata, not implemented");
+      log.info("Ignore metadata, not implemented"); // TODO:
       this.metadata = list;
    }
 
    @Override
    public Executor getExecutor()
    {
-      return executor;
+      return this.executor;
    }
 
    @Override
    public void setExecutor(Executor executor)
    {
-      log.info("Ignore executor, not implemented");
+      log.info("Ignore executor, not implemented"); // TODO
       this.executor = executor;
    }
 
    @Override
    public Map<String, Object> getProperties()
    {
-      return properties;
+      return this.properties;
    }
 
    @Override
    public void setProperties(Map<String, Object> map)
    {
-      properties = map;
+      this.properties = map;
    }
 
    private void checkPublishEndpointPermission()
@@ -261,12 +276,105 @@ public class EndpointImpl extends Endpoint21
    @Override
    public EndpointReference getEndpointReference(Element... referenceParameters)
    {
-      throw new NotImplementedException();
+      return getEndpointReference(W3CEndpointReference.class, referenceParameters);
    }
 
    @Override
    public <T extends EndpointReference> T getEndpointReference(Class<T> clazz, Element... referenceParameters)
    {
-      throw new NotImplementedException();
+      if (isDestroyed || !isPublished)
+         throw new WebServiceException("Cannot get EPR for an unpubblished or already destroyed endpoint!");
+
+      if (getBinding() instanceof HTTPBinding)
+      {
+         throw new UnsupportedOperationException("Cannot get epr when using the XML/HTTP binding");
+      }
+      W3CEndpointReferenceBuilder builder = new W3CEndpointReferenceBuilder();
+      builder.address(address.toString());
+      builder.wsdlDocumentLocation(address.toString() +  "?wsdl");
+      //TODO set other parameters in the builder
+      if (referenceParameters != null && W3CEndpointReference.class.getName().equals(clazz.getName()))
+      {
+         for (Element el : referenceParameters)
+            builder.referenceParameter(el);
+      }
+
+      return EndpointReferenceUtil.transform(clazz, builder.build());
    }
+   
+   public String getPath()
+   {
+      String path = this.address.getPath();
+      while (path.endsWith("/"))
+      {
+         path = path.substring(0, path.length() - 1);
+      }
+      return path;
+   }
+   
+   public int getPort()
+   {
+      return this.address.getPort();
+   }
+   
+   public String getContextRoot()
+   {
+      final StringTokenizer st = new StringTokenizer(this.getPath(), "/");
+      
+      String contextRoot = "/";
+      
+      if (st.hasMoreTokens())
+      {
+         contextRoot += st.nextToken();
+      }
+      
+      return contextRoot;
+   }
+   
+   public String getPathWithoutContext()
+   {
+      // TODO: optimize this method
+      StringTokenizer st = new StringTokenizer(this.getPath(), "/");
+      if (st.hasMoreTokens())
+      {
+         st.nextToken();
+      }
+      StringBuilder sb = new StringBuilder();
+      while (st.hasMoreTokens())
+      {
+         sb.append('/');
+         sb.append(st.nextToken());
+      }
+      sb.append('/');
+      
+      return sb.toString();
+   }
+   
+   public void setDeployment(final Deployment dep)
+   {
+      if (this.dep == null)
+      {
+         this.dep = dep;
+      }
+   }
+   
+   public Deployment getDeployment()
+   {
+      return this.dep;
+   }
+   
+   public void publish(final javax.xml.ws.spi.http.HttpContext serverContext)
+   {
+      // JAX-WS Endpoint API is broken by design and reveals many implementation details 
+      // of JAX-WS RI that are not portable cross different application servers :(
+      log.warn("publish(javax.xml.ws.spi.http.HttpContext) not implemented"); // TODO implement?
+   }
+
+   public void setEndpointContext(final javax.xml.ws.EndpointContext endpointContext)
+   {
+      // JAX-WS Endpoint API is broken by design and reveals many implementation details 
+      // of JAX-WS RI that are not portable cross different application servers :(
+      log.warn("setEndpointContext(javax.xml.ws.EndpointContext) not implemented"); // TODO implement?
+   }
+
 }

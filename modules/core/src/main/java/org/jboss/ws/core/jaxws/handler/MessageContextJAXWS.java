@@ -24,6 +24,7 @@ package org.jboss.ws.core.jaxws.handler;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.net.URL;
 
 import javax.xml.ws.handler.MessageContext;
@@ -109,15 +110,14 @@ public abstract class MessageContextJAXWS extends CommonMessageContext implement
       if (outbound == null)
          throw new IllegalStateException("Cannot find property: " + MessageContext.MESSAGE_OUTBOUND_PROPERTY);
 
-      MessageContextAssociation.popMessageContext();
+      MessageContextAssociation.popMessageContext(false);
       SOAPMessageContextJAXWS resContext = new SOAPMessageContextJAXWS(reqContext);
       resContext.setSOAPMessage(null);
 
       // Reverse the direction
-      resContext.put(MessageContext.MESSAGE_OUTBOUND_PROPERTY, new Boolean(!outbound));
+      resContext.put(MessageContext.MESSAGE_OUTBOUND_PROPERTY, Boolean.valueOf(!outbound));
 
       MessageContextAssociation.pushMessageContext(resContext);
-      cleanupAttachments(reqContext);
 
       return resContext;
    }
@@ -127,7 +127,7 @@ public abstract class MessageContextJAXWS extends CommonMessageContext implement
    {
       super.setOperationMetaData(opMetaData);
 
-      // [JBWS-2031] Implement standard message context properties
+      // [JBWS-2013] Implement standard message context properties
       if (opMetaData != null)
       {
          EndpointMetaData epMetaData = opMetaData.getEndpointMetaData();
@@ -138,17 +138,22 @@ public abstract class MessageContextJAXWS extends CommonMessageContext implement
          {
             try
             {
-               ByteArrayOutputStream baos = new ByteArrayOutputStream();
-               IOUtils.copyStream(baos, wsdlURL.openStream()); // [JBWS-2325] ensure file descriptors are closed
-               InputSource inputSource = new InputSource(new ByteArrayInputStream(baos.toByteArray()));
-               put(MessageContext.WSDL_DESCRIPTION, inputSource);
+               put(MessageContext.WSDL_DESCRIPTION, wsdlURL.toURI());
             }
-            catch (IOException ex)
+            catch (URISyntaxException e)
             {
-               throw new WSException("Cannot open: " + wsdlURL);
+               if (log.isTraceEnabled())
+               {
+                  log.trace("Cannot convert the WSDL URL to a URI", e);
+               }
+               else
+               {
+                  log.debug("Cannot convert the WSDL URL to a URI");
+               }
             }
          }
 
+         
          put(MessageContext.WSDL_SERVICE, serviceMetaData.getServiceName());
          put(MessageContext.WSDL_PORT, epMetaData.getPortName());
          put(MessageContext.WSDL_INTERFACE, epMetaData.getPortTypeName());

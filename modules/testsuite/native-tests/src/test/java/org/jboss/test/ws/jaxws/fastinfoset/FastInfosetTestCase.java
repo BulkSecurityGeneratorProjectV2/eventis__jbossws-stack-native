@@ -28,10 +28,11 @@ import java.net.URL;
 import java.net.URLConnection;
 
 import javax.xml.namespace.QName;
-import javax.xml.ws.Service21;
+import javax.xml.ws.Service;
 
 import junit.framework.Test;
 
+import org.jboss.ws.core.soap.attachment.MimeConstants;
 import org.jboss.ws.feature.FastInfosetFeature;
 import org.jboss.wsf.common.DOMUtils;
 import org.jboss.wsf.test.JBossWSTest;
@@ -79,13 +80,14 @@ public class FastInfosetTestCase extends JBossWSTest
       
       int resCode = con.getResponseCode();
       assertEquals(200, resCode);
+      assertEquals(MimeConstants.TYPE_FASTINFOSET, con.getContentType());
    }
    
    public void testRoundTrip() throws Exception
    {
       URL wsdlURL = new URL("http://" + getServerHost() + ":8080/jaxws-fastinfoset?wsdl");
       QName serviceName = new QName("http://org.jboss.ws/fastinfoset", "FastInfosetEndpointService");
-      Service21 service = Service21.create(wsdlURL, serviceName);
+      Service service = Service.create(wsdlURL, serviceName);
 
       FastInfosetFeature feature = new FastInfosetFeature();
       FastInfoset port = service.getPort(FastInfoset.class, feature);

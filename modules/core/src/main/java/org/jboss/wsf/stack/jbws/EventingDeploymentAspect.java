@@ -27,7 +27,7 @@ import org.jboss.ws.extensions.eventing.metadata.EventingEpMetaExt;
 import org.jboss.ws.extensions.eventing.mgmt.SubscriptionManagerFactory;
 import org.jboss.ws.extensions.eventing.mgmt.SubscriptionManagerMBean;
 import org.jboss.ws.metadata.umdm.ServerEndpointMetaData;
-import org.jboss.wsf.spi.deployment.DeploymentAspect;
+import org.jboss.wsf.common.integration.AbstractDeploymentAspect;
 import org.jboss.wsf.spi.deployment.Deployment;
 import org.jboss.wsf.spi.deployment.Endpoint;
 
@@ -38,7 +38,7 @@ import org.jboss.wsf.spi.deployment.Endpoint;
  * @author Thomas.Diesler@jboss.org
  * @since 25-Apr-2007
  */
-public class EventingDeploymentAspect extends DeploymentAspect
+public class EventingDeploymentAspect extends AbstractDeploymentAspect
 {
    @Override
    public void start(Deployment dep)
@@ -70,7 +70,7 @@ public class EventingDeploymentAspect extends DeploymentAspect
    }
 
    @Override
-   public void destroy(Deployment dep)
+   public void stop(Deployment dep)
    {
       for (Endpoint ep : dep.getService().getEndpoints())
       {

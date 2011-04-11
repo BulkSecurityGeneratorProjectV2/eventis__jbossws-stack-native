@@ -72,7 +72,7 @@ public class JBWS771TestCase extends JBossWSTest
       if (port == null)
       {
          QName serviceName = new QName(TARGET_NAMESPACE, "JBWS771Service");
-         wsdlURL = new URL("http://" + getServerHost() + ":8080/jaxws-jbws771/IWebsvcImpl?wsdl");
+         wsdlURL = new URL("http://" + getServerHost() + ":8080/jaxws-jbws771/JBWS771Service/IWebsvcImpl?wsdl");
 
          Service service = Service.create(wsdlURL, serviceName);
          port = service.getPort(IWebsvc.class);
@@ -150,7 +150,7 @@ public class JBWS771TestCase extends JBossWSTest
       String absOutput = createResourceFile("wsconsume" + FS + "java").getAbsolutePath();
       String command = JBOSS_HOME + FS + "bin" + FS + "wsconsume" + EXT + " -k -o " + absOutput + " --extension --binding=" + RESOURCES_DIR + FS + "jaxws" + FS + "jbws771" + FS + "binding.xml " + wsdlURL.toExternalForm();
       executeCommand(command);
-      File javaSource = getResourceFile("wsconsume" + FS + "java" + FS + "org" + FS + "jboss" + FS + "test" + FS + "ws" + FS + "jaxws" + FS + "jbws771" + FS + "JBWS771Service.java");
+      File javaSource = getResourceFile("wsconsume" + FS + "java" + FS + "foo" + FS + "bar" + FS + "com" + FS + "JBWS771Service.java");
       assertTrue("Service endpoint interface not generated", javaSource.exists());
    }
 

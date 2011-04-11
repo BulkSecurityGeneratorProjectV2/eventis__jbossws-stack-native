@@ -118,12 +118,9 @@ public class SOAPFactoryImpl extends SOAPFactory
       String prefix = domElement.getPrefix() != null ? domElement.getPrefix() : "";
       String nsURI = domElement.getNamespaceURI() != null ? domElement.getNamespaceURI() : "";
 
-//      SOAPFactory factory = SOAPFactory.newInstance();
-//      SOAPElement soapElement = factory.createElement(localName, prefix, nsURI);
-      SOAPElement soapElement = createElement(localName, prefix, nsURI);
+      SOAPElement soapElement = this.createElement(localName, prefix, nsURI);
 
-      if (domElement instanceof Element)
-         DOMUtils.copyAttributes(soapElement, (Element)domElement);
+      DOMUtils.copyAttributes(soapElement, domElement);
 
       if (deep)
       {
@@ -152,7 +149,7 @@ public class SOAPFactoryImpl extends SOAPFactory
             }
             else
             {
-               log.trace("Ignore child type: " + nodeType);
+               if (log.isTraceEnabled()) log.trace("Ignore child type: " + nodeType);
             }
          }
       }

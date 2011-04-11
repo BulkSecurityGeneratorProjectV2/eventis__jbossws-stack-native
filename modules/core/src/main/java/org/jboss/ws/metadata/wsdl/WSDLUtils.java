@@ -256,18 +256,12 @@ public class WSDLUtils
 
    /** Check if this method should be ignored
     */
-   public boolean checkIgnoreMethod(Method method)
+   public boolean checkIgnoreMethod(final Method method)
    {
-      String methodname = method.getName();
       if (ignoredMethods == null)
       {
          ignoredMethods = new ArrayList<String>();
-         Method[] objMethods = Object.class.getMethods();
-         for (int i = 0; i < objMethods.length; i++)
-         {
-            ignoredMethods.add(objMethods[i].getName());
-         }
-         //Add the SessionBean Methods to the ignore list
+         //Add the SessionBean methods to the ignore list
          Method[] sbMethods = SessionBean.class.getMethods();
          for (int i = 0; i < sbMethods.length; i++)
          {
@@ -275,15 +269,55 @@ public class WSDLUtils
          }
       }
 
-      boolean ignoreMethod = ignoredMethods.contains(methodname);
-
-      // FIXME: This code is a duplicate, it should read from the UMDM
-      if (method.getDeclaringClass().isAnnotationPresent(WebService.class) && method.isAnnotationPresent(WebMethod.class) == false)
-         ignoreMethod = true;
-
-      return ignoreMethod;
+      return ignoredMethods.contains(method.getName());
    }
-
+   
+   /**
+    * The public, non-static or non-final methods that satisfy one of the following conditions:
+    * 1. They are annotated with the javax.jws.WebMethod annotation with the exclude element set to
+    * false or missing (since false is the default for this annotation element).
+    * 2. They are not annotated with the javax.jws.WebMethod annotation but their declaring class has a
+    * javax.jws.WebService annotation.
+    * @param method to process
+    * @return true if webmethod, false otherwise
+    */
+   public static boolean isWebMethod(final Method method, final boolean definedInInterface)
+   {
+      if (!isWebMethodCandidate(method))
+         return false;
+         
+      final WebMethod webMethodAnnotation = method.getAnnotation(WebMethod.class);
+      
+      if (webMethodAnnotation != null)
+      {
+         return !webMethodAnnotation.exclude();
+      }
+      if (definedInInterface)
+      {
+         return true;
+      }
+      else
+      {
+         return method.getDeclaringClass().getAnnotation(WebService.class) != null;
+      }
+   }
+   
+   /**
+    * Only public, non-static and non-final methods are web method candidates.
+    *
+    * @param method to process
+    * @return true if satisfies modifier requirements, false otherwise
+    */
+   private static boolean isWebMethodCandidate(final Method method)
+   {
+      final int modifiers = method.getModifiers();
+      final boolean isPublic = Modifier.isPublic(modifiers);
+      final boolean isNotStatic = !Modifier.isStatic(modifiers);
+      final boolean isNotFinal = !Modifier.isFinal(modifiers);
+      
+      return isPublic && isNotStatic && isNotFinal;
+   }
+   
    /**
     * Chop "PortType" at the end of the String
     * @param name
@@ -442,15 +476,15 @@ public class WSDLUtils
     */
    public String firstLetterUpperCase(String fname)
    {
-      if (fname == "" || fname == null)
+      if (fname == null || fname.length() == 0)
          throw new WSException("String passed is null");
       //Ensure that the first character is uppercase
-      if (Character.isLowerCase(fname.charAt(0)))
+      final char firstChar = fname.charAt(0);
+      if (Character.isLowerCase(firstChar))
       {
-         char[] chars = fname.toCharArray();
-         char f = Character.toUpperCase(chars[0]);
-         chars[0] = f;
-         fname = new String(chars);
+         final StringBuilder sb = new StringBuilder(fname);
+         sb.setCharAt(0, Character.toUpperCase(firstChar));
+         fname = sb.toString();
       }
       return fname;
    }
@@ -546,7 +580,7 @@ public class WSDLUtils
     */
    public static String getJustClassName(String classname)
    {
-      int index = classname.lastIndexOf(".");
+      int index = classname.lastIndexOf('.');
       if (index < 0)
          index = 0;
       else index = index + 1;
@@ -645,9 +679,9 @@ public class WSDLUtils
       StringBuilder sb = new StringBuilder();
       String prefix = qn.getPrefix();
       String localpart = qn.getLocalPart();
-      if (prefix == null || prefix == "")
+      if (prefix == null || prefix.length() == 0)
          prefix = Constants.PREFIX_TNS;
-      sb.append(prefix + ":");
+      sb.append(prefix).append(':');
       sb.append(localpart);
 
       return sb.toString();
@@ -661,7 +695,7 @@ public class WSDLUtils
    public QName getQName(String formattedStr)
    {
       QName qn = null;
-      int ind = formattedStr.lastIndexOf(":");
+      int ind = formattedStr.lastIndexOf(':');
       if (ind < 0)
          throw new IllegalArgumentException("Formatted String is not of format prefix:localpart");
       String prefix = formattedStr.substring(0, ind);
@@ -722,12 +756,12 @@ public class WSDLUtils
       while (!stk.isEmpty() && (next = stk.pop()) != null)
       {
          if (sb.toString().equals("http://") == false)
-            sb.append(".");
+            sb.append('.');
          sb.append(next);
       }
 
       // trailing slash
-      sb.append("/");
+      sb.append('/');
 
       return sb.toString();
    }

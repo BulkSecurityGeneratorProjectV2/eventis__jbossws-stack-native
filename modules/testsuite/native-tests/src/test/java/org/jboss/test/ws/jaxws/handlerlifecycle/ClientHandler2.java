@@ -24,7 +24,6 @@ package org.jboss.test.ws.jaxws.handlerlifecycle;
 import javax.xml.ws.WebServiceException;
 import javax.xml.ws.handler.MessageContext;
 
-
 public class ClientHandler2 extends LifecycleHandler
 {
    protected boolean handleOutboundMessage(MessageContext msgContext)

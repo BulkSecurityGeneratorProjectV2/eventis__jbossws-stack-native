@@ -1,6 +1,6 @@
 /*
  * JBoss, Home of Professional Open Source.
- * Copyright 2006, Red Hat Middleware LLC, and individual contributors
+ * Copyright 2009, Red Hat Middleware LLC, and individual contributors
  * as indicated by the @author tags. See the copyright.txt file in the
  * distribution for a full listing of individual contributors.
  *
@@ -21,16 +21,19 @@
  */
 package org.jboss.ws.extensions.wsrm.transport;
 
-import static org.jboss.ws.extensions.wsrm.transport.RMChannelConstants.*;
+import static org.jboss.ws.extensions.wsrm.transport.RMChannelConstants.INVOCATION_CONTEXT;
+import static org.jboss.ws.extensions.wsrm.transport.RMChannelConstants.MARSHALLER;
+import static org.jboss.ws.extensions.wsrm.transport.RMChannelConstants.REMOTING_INVOCATION_CONTEXT;
+import static org.jboss.ws.extensions.wsrm.transport.RMChannelConstants.SERIALIZATION_CONTEXT;
+import static org.jboss.ws.extensions.wsrm.transport.RMChannelConstants.UNMARSHALLER;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
-import java.util.Map;
 
-import org.jboss.remoting.marshal.Marshaller;
-import org.jboss.remoting.marshal.UnMarshaller;
 import org.jboss.ws.core.MessageAbstraction;
+import org.jboss.ws.core.client.Marshaller;
+import org.jboss.ws.core.client.UnMarshaller;
 
 /**
  * Translates JBoss messages to RM sources and vice-versa.
@@ -76,11 +79,8 @@ public final class RMMessageAssembler
          byte[] payload = rmResponse.getPayload();
          InputStream in = (payload == null) ? null : new ByteArrayInputStream(rmResponse.getPayload()); 
          UnMarshaller unmarshaller = (UnMarshaller)rmMetadata.getContext(SERIALIZATION_CONTEXT).get(UNMARSHALLER);
-         response = (MessageAbstraction)unmarshaller.read(in, rmResponse.getMetadata().getContext(REMOTING_INVOCATION_CONTEXT));
+         response = (MessageAbstraction)unmarshaller.read(in, rmMetadata.getContext(INVOCATION_CONTEXT), rmMetadata.getContext(REMOTING_INVOCATION_CONTEXT));
       }
-      Map<String, Object> invocationContext = rmMetadata.getContext(INVOCATION_CONTEXT);
-      invocationContext.clear();
-      invocationContext.putAll(rmMetadata.getContext(REMOTING_INVOCATION_CONTEXT));
       return response;
    }
    

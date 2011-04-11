@@ -210,7 +210,9 @@ public class MessageFactoryImpl extends MessageFactory
       }
 
       ContentType contentType = getContentType(mimeHeaders);
-      log.debug("createMessage: [contentType=" + contentType + "]");
+      if (log.isDebugEnabled()) {
+         log.debug("createMessage: [contentType=" + contentType + "]");
+      }
 
       SOAPMessageImpl soapMessage = new SOAPMessageImpl();
       String encoding = contentType.getParameterList().get("charset");
@@ -255,6 +257,17 @@ public class MessageFactoryImpl extends MessageFactory
 
             inputStream = decoder.getRootPart().getDataHandler().getInputStream();
             attachments = decoder.getRelatedParts();
+            if (isXOPContent(contentType))
+            {
+               soapMessage.setXOPMessage(true);
+            }
+         }
+         else if (isFastInfosetContent(contentType))
+         {
+            if (!features.isFeatureEnabled(FastInfosetFeature.class))
+            {
+               throw new SOAPException("FastInfoset support is not enabled, use FastInfosetFeature to enable it.");
+            }
          }
          else if (isSoapContent(contentType) == false)
          {
@@ -277,6 +290,15 @@ public class MessageFactoryImpl extends MessageFactory
          {
             envBuilder = (EnvelopeBuilder)ServiceLoader.loadService(EnvelopeBuilder.class.getName(), null);
          }
+         //if inputstream is empty, no need to build
+         if (inputStream.markSupported()) {
+        	 inputStream.mark(1);
+    		 final int bytesRead = inputStream.read(new byte[1]);
+    		 inputStream.reset();
+    		 if (bytesRead == -1) {
+    			return soapMessage;
+    		 }
+    	  }
 
          // Build the payload
          envBuilder.setStyle(getStyle());
@@ -313,10 +335,22 @@ public class MessageFactoryImpl extends MessageFactory
       String baseType = type.getBaseType();
       return MimeConstants.TYPE_SOAP11.equalsIgnoreCase(baseType) || MimeConstants.TYPE_SOAP12.equalsIgnoreCase(baseType);
    }
+   
+   private boolean isFastInfosetContent(ContentType type)
+   {
+      String baseType = type.getBaseType();
+      return MimeConstants.TYPE_FASTINFOSET.equalsIgnoreCase(baseType);
+   }
 
    private boolean isMultipartRelatedContent(ContentType type)
    {
       String baseType = type.getBaseType();
       return MimeConstants.TYPE_MULTIPART_RELATED.equalsIgnoreCase(baseType);
+   }
+   
+   private boolean isXOPContent(ContentType type)
+   {      
+      String paramType = type.getParameter("type");
+      return MimeConstants.TYPE_APPLICATION_XOP_XML.endsWith(paramType);
    }
 }

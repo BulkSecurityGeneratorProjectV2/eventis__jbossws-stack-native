@@ -43,6 +43,8 @@ import javax.xml.ws.addressing.JAXWSAConstants;
 
 import org.jboss.logging.Logger;
 import org.jboss.ws.annotation.EndpointConfig;
+import org.jboss.wsf.spi.annotation.AuthMethod;
+import org.jboss.wsf.spi.annotation.TransportGuarantee;
 import org.jboss.wsf.spi.annotation.WebContext;
 
 
@@ -53,16 +55,25 @@ import org.jboss.wsf.spi.annotation.WebContext;
  * @since 31-Jan-2008
  */
 @Stateless
-@WebService(name = "DarEndpoint",
-            targetNamespace = "http://org.jboss.ws/samples/dar",
-            serviceName = "DarService")
-@SOAPBinding(style = SOAPBinding.Style.RPC,
-             use = SOAPBinding.Use.LITERAL)
-@WebContext(contextRoot="/dar",
-            urlPattern="/*",
-            authMethod="BASIC",
-            transportGuarantee="NONE",
-            secureWSDLAccess=false)
+@SOAPBinding
+(
+   style = SOAPBinding.Style.RPC,
+   use = SOAPBinding.Use.LITERAL
+)
+@WebService
+(
+   name = "DarEndpoint",
+   serviceName = "DarService",
+   targetNamespace = "http://org.jboss.ws/samples/dar"
+)
+@WebContext
+(
+   contextRoot = "/dar",
+   urlPattern = "/*",
+   authMethod = AuthMethod.BASIC,
+   transportGuarantee = TransportGuarantee.NONE,
+   secureWSDLAccess = false
+)
 @EndpointConfig(configName = "Standard WSAddressing Endpoint")
 public class DarAddressingEndpoint
 {
@@ -90,12 +101,13 @@ public class DarAddressingEndpoint
    @Oneway
    public void onewayProcess(DarRequest request)
    {
+      QueueConnection con = null;
       QueueSession queueSession =null;
       QueueSender sender = null;
       try {
          InitialContext context = new InitialContext();
          QueueConnectionFactory connectionFactory = (QueueConnectionFactory)context.lookup("ConnectionFactory");
-         QueueConnection con = connectionFactory.createQueueConnection();
+         con = connectionFactory.createQueueConnection();
          queueSession = con.createQueueSession(false, Session.AUTO_ACKNOWLEDGE);
          Queue queue = (Queue)context.lookup("queue/DarQueue");
          sender = queueSession.createSender(queue);
@@ -118,6 +130,11 @@ public class DarAddressingEndpoint
          try
          {
             queueSession.close();
+         }
+         catch(Exception e1) {}
+         try
+         {
+            con.close();
          }
          catch(Exception e1) {}
       }

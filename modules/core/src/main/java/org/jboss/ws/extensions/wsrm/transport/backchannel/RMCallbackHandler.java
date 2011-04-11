@@ -21,7 +21,7 @@
  */
 package org.jboss.ws.extensions.wsrm.transport.backchannel;
 
-import org.jboss.remoting.InvocationRequest;
+import org.jboss.ws.core.server.netty.NettyCallbackHandler;
 import org.jboss.ws.extensions.wsrm.transport.RMMessage;
 import org.jboss.ws.extensions.wsrm.transport.RMUnassignedMessageListener;
 
@@ -32,10 +32,9 @@ import org.jboss.ws.extensions.wsrm.transport.RMUnassignedMessageListener;
  *
  * @since Nov 21, 2007
  */
-public interface RMCallbackHandler
+public interface RMCallbackHandler extends NettyCallbackHandler
 {
-   String getHandledPath();
-   void handle(InvocationRequest payload);
+   void handle(RMMessage message);
    RMMessage getMessage(String messageId);
    Throwable getFault(String messageId);
    void addUnassignedMessageListener(RMUnassignedMessageListener listener);

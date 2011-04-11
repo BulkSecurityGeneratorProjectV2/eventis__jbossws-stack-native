@@ -48,6 +48,7 @@ import org.jboss.ws.Constants;
 import org.jboss.ws.core.CommonBindingProvider;
 import org.jboss.ws.core.CommonClient;
 import org.jboss.ws.core.CommonMessageContext;
+import org.jboss.ws.core.EndpointInvocation;
 import org.jboss.ws.core.RoleSource;
 import org.jboss.ws.core.WSTimeoutException;
 import org.jboss.ws.core.binding.TypeMappingImpl;
@@ -87,6 +88,8 @@ public class CallImpl extends CommonClient implements Call, RoleSource
    private QName portType;
    // A Map<String,Object> of Call properties
    private Map<String, Object> properties = new HashMap<String, Object>();
+   // The EndpointInvocation for the call.
+   private EndpointInvocation epInv;
 
    // The set of supported properties
    private static final Set<String> standardProperties = new HashSet<String>();
@@ -153,6 +156,14 @@ public class CallImpl extends CommonClient implements Call, RoleSource
    {
       return properties;
    }
+   
+   @Override
+   protected EndpointInvocation createEndpointInvocation(OperationMetaData opMetaData)
+   {
+      epInv = super.createEndpointInvocation(opMetaData);
+
+      return epInv;
+   }
 
    /** Gets the address of a target service endpoint.
     */
@@ -213,6 +224,7 @@ public class CallImpl extends CommonClient implements Call, RoleSource
       paramMetaData.setMode(mode);
       paramMetaData.setInHeader(inHeader);
       paramMetaData.setIndex(opMetaData.getParameters().size());
+
       opMetaData.addParameter(paramMetaData);
 
       registerParameterType(xmlType, javaType);
@@ -245,7 +257,7 @@ public class CallImpl extends CommonClient implements Call, RoleSource
          throw new IllegalArgumentException("Invalid null parameter");
 
       OperationMetaData opMetaData = getOperationMetaData();
-      QName xmlName = new QName(Constants.DEFAULT_RPC_RETURN_NAME);
+      QName xmlName = new QName("");
       String javaTypeName = javaType.getName();
       ParameterMetaData retMetaData = new ParameterMetaData(opMetaData, xmlName, xmlType, javaTypeName);
       opMetaData.setReturnParameter(retMetaData);
@@ -473,7 +485,8 @@ public class CallImpl extends CommonClient implements Call, RoleSource
       ParameterMetaData paramMetaData = opMetaData.getParameter(new QName(paramName));
       if (paramMetaData != null)
          return paramMetaData.getXmlType();
-      else return null;
+      else
+         return null;
    }
 
    protected CommonBindingProvider getCommonBindingProvider()

@@ -1,6 +1,6 @@
 /*
  * JBoss, Home of Professional Open Source.
- * Copyright 2006, Red Hat Middleware LLC, and individual contributors
+ * Copyright 2009, Red Hat Middleware LLC, and individual contributors
  * as indicated by the @author tags. See the copyright.txt file in the
  * distribution for a full listing of individual contributors.
  *
@@ -49,6 +49,7 @@ import javax.xml.soap.SOAPPart;
 import javax.xml.ws.addressing.AddressingProperties;
 import javax.xml.ws.addressing.JAXWSAConstants;
 import javax.xml.ws.http.HTTPBinding;
+import javax.xml.ws.soap.AddressingFeature;
 
 import org.jboss.logging.Logger;
 import org.jboss.ws.Constants;
@@ -65,6 +66,7 @@ import org.jboss.ws.core.jaxrpc.handler.MessageContextJAXRPC;
 import org.jboss.ws.core.jaxrpc.handler.SOAPMessageContextJAXRPC;
 import org.jboss.ws.core.jaxws.handler.MessageContextJAXWS;
 import org.jboss.ws.core.jaxws.handler.SOAPMessageContextJAXWS;
+import org.jboss.ws.core.jaxws.spi.http.AbstractNettyMessage;
 import org.jboss.ws.core.server.MimeHeaderSource;
 import org.jboss.ws.core.server.ServiceEndpointInvoker;
 import org.jboss.ws.core.server.ServletHeaderSource;
@@ -86,6 +88,10 @@ import org.jboss.ws.feature.JsonEncodingFeature;
 import org.jboss.ws.metadata.umdm.EndpointMetaData;
 import org.jboss.ws.metadata.umdm.ServerEndpointMetaData;
 import org.jboss.ws.metadata.umdm.EndpointMetaData.Type;
+import org.jboss.wsf.common.DOMWriter;
+import org.jboss.wsf.common.IOUtils;
+import org.jboss.wsf.spi.SPIProvider;
+import org.jboss.wsf.spi.SPIProviderResolver;
 import org.jboss.wsf.spi.deployment.Endpoint;
 import org.jboss.wsf.spi.deployment.Endpoint.EndpointState;
 import org.jboss.wsf.spi.invocation.InvocationContext;
@@ -93,11 +99,6 @@ import org.jboss.wsf.spi.invocation.RequestHandler;
 import org.jboss.wsf.spi.management.EndpointMetrics;
 import org.jboss.wsf.spi.management.ServerConfig;
 import org.jboss.wsf.spi.management.ServerConfigFactory;
-import org.jboss.wsf.spi.SPIProviderResolver;
-import org.jboss.wsf.spi.SPIProvider;
-import org.jboss.wsf.common.DOMWriter;
-import org.jboss.wsf.common.DOMUtils;
-import org.jboss.wsf.common.IOUtils;
 import org.w3c.dom.Document;
 
 import com.sun.xml.fastinfoset.dom.DOMDocumentSerializer;
@@ -113,16 +114,31 @@ public class RequestHandlerImpl implements RequestHandler
    // provide logging
    private static final Logger log = Logger.getLogger(RequestHandlerImpl.class);
 
-   private ServerConfig serverConfig;
-   private MessageFactoryImpl msgFactory;
+   protected ServerConfig serverConfig;
+   protected MessageFactoryImpl msgFactory;
 
    public RequestHandlerImpl()
    {
-      SPIProvider spiProvider = SPIProviderResolver.getInstance().getProvider();
-      serverConfig = spiProvider.getSPI(ServerConfigFactory.class).getServerConfig();
-      msgFactory = new MessageFactoryImpl();
+      final SPIProvider spiProvider = SPIProviderResolver.getInstance().getProvider();
+      final ServerConfig serverConfig = spiProvider.getSPI(ServerConfigFactory.class).getServerConfig();
+      
+      this.init(serverConfig);
+   }
+   
+   public RequestHandlerImpl(final ServerConfig serverConfig)
+   {
+      if (serverConfig == null) 
+         throw new IllegalArgumentException("server config cannot be null");
+      
+      this.init(serverConfig);
    }
 
+   private void init(final ServerConfig serverConfig)
+   {
+      this.serverConfig = serverConfig;
+      this.msgFactory = new MessageFactoryImpl();
+   }
+   
    public void handleHttpRequest(Endpoint endpoint, HttpServletRequest req, HttpServletResponse res, ServletContext context) throws ServletException, IOException
    {
       String method = req.getMethod();
@@ -187,7 +203,8 @@ public class RequestHandlerImpl implements RequestHandler
 
    private void doPost(Endpoint endpoint, HttpServletRequest req, HttpServletResponse res, ServletContext context) throws ServletException, IOException
    {
-      log.debug("doPost: " + req.getRequestURI());
+      if (log.isDebugEnabled())
+         log.debug("doPost: " + req.getRequestURI());
 
       ServletInputStream in = req.getInputStream();
       ServletOutputStream out = res.getOutputStream();
@@ -197,8 +214,8 @@ public class RequestHandlerImpl implements RequestHandler
          throw new IllegalStateException("Deployment has no classloader associated");
 
       // Set the thread context class loader
-      ClassLoader ctxClassLoader = Thread.currentThread().getContextClassLoader();
-      Thread.currentThread().setContextClassLoader(classLoader);
+      ClassLoader ctxClassLoader = SecurityActions.getContextClassLoader();
+      SecurityActions.setContextClassLoader(classLoader);
       try
       {
          ServletRequestContext reqContext = new ServletRequestContext(context, req, res);
@@ -211,7 +228,7 @@ public class RequestHandlerImpl implements RequestHandler
       finally
       {
          // Reset the thread context class loader
-         Thread.currentThread().setContextClassLoader(ctxClassLoader);
+         SecurityActions.setContextClassLoader(ctxClassLoader);
 
          try
          {
@@ -231,9 +248,11 @@ public class RequestHandlerImpl implements RequestHandler
       }
    }
 
+   @SuppressWarnings("unchecked")
    public void handleRequest(Endpoint endpoint, InputStream inStream, OutputStream outStream, InvocationContext invContext)
    {
-      log.debug("handleRequest: " + endpoint.getName());
+      if (log.isDebugEnabled())
+         log.debug("handleRequest: " + endpoint.getName());
 
       ServerEndpointMetaData sepMetaData = endpoint.getAttachment(ServerEndpointMetaData.class);
       if (sepMetaData == null)
@@ -251,14 +270,16 @@ public class RequestHandlerImpl implements RequestHandler
       else
       {
          msgContext = new SOAPMessageContextJAXWS();
-         msgContext.put(MessageContextJAXWS.MESSAGE_OUTBOUND_PROPERTY, new Boolean(false));
+         msgContext.put(MessageContextJAXWS.MESSAGE_OUTBOUND_PROPERTY, Boolean.valueOf(false));
          msgContext.put(MessageContextJAXWS.INBOUND_MESSAGE_ATTACHMENTS, new HashMap<String, DataHandler>());
+         msgContext.put(MessageContextJAXWS.OUTBOUND_MESSAGE_ATTACHMENTS, new HashMap<String, DataHandler>());
          invContext.addAttachment(javax.xml.ws.handler.MessageContext.class, msgContext);
       }
 
       // Set servlet specific properties
       HttpServletResponse httpResponse = null;
       ServletHeaderSource headerSource = null;
+      AbstractNettyMessage nettyMessage = this.getNettyHeadersSource(invContext);
       if (invContext instanceof ServletRequestContext)
       {
          ServletRequestContext reqContext = (ServletRequestContext)invContext;
@@ -292,18 +313,32 @@ public class RequestHandlerImpl implements RequestHandler
       try
       {
          msgContext.setEndpointMetaData(sepMetaData);
-         MessageAbstraction resMessage = processRequest(endpoint, headerSource, invContext, inStream);
-
+         MessageAbstraction resMessage = processRequest(endpoint, nettyMessage == null ? headerSource : nettyMessage, invContext, inStream);
+         CommonMessageContext reqMsgContext = msgContext;
          // Replace the message context with the response context
          msgContext = MessageContextAssociation.peekMessageContext();
 
          Map<String, List<String>> headers = (Map<String, List<String>>)msgContext.get(MessageContextJAXWS.HTTP_RESPONSE_HEADERS);
-         if (headerSource != null && headers != null)
-            headerSource.setHeaderMap(headers);
+         if (headers != null)
+         {
+            if (headerSource != null)
+            {
+               headerSource.setHeaderMap(headers);
+            }
+         }
 
          Integer code = (Integer)msgContext.get(MessageContextJAXWS.HTTP_RESPONSE_CODE);
-         if (httpResponse != null && code != null)
-            httpResponse.setStatus(code.intValue());
+         if (code != null)
+         {
+            if (httpResponse != null)
+            {
+               httpResponse.setStatus(code.intValue());
+            }
+            else if (nettyMessage != null)
+            {
+               nettyMessage.setStatus(code.intValue());
+            }
+         }
 
          boolean isFault = false;
          if (resMessage instanceof SOAPMessage)
@@ -319,9 +354,16 @@ public class RequestHandlerImpl implements RequestHandler
             // by a null envelope.
             SOAPEnvelope soapEnv = part.getEnvelope();
             isFault = soapEnv != null && soapEnv.getBody().hasFault();
-            if (httpResponse != null && isFault)
+            if (isFault)
             {
-               httpResponse.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+               if (httpResponse != null)
+               {
+                  httpResponse.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+               }
+               else if (nettyMessage != null)
+               {
+                  nettyMessage.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+               }
             }
          }
 
@@ -330,6 +372,7 @@ public class RequestHandlerImpl implements RequestHandler
          boolean isWsrmOneWay = isWsrmMessage && (Boolean)rmResCtx.get(RMConstant.ONE_WAY_OPERATION);
          if ((outStream != null) && (isWsrmOneWay == false)) // RM hack
             sendResponse(endpoint, outStream, isFault);
+         CommonMessageContext.cleanupAttachments(reqMsgContext);
       }
       catch (Exception ex)
       {
@@ -337,7 +380,6 @@ public class RequestHandlerImpl implements RequestHandler
       }
       finally
       {
-
          // Cleanup outbound attachments
          CommonMessageContext.cleanupAttachments(MessageContextAssociation.peekMessageContext());
 
@@ -346,16 +388,12 @@ public class RequestHandlerImpl implements RequestHandler
 
          // clear thread local storage
          ThreadLocalAssociation.clear();
-         DOMUtils.clearThreadLocals();
-         try
-         {
-            outStream.close();
-         }
-         catch (IOException ex)
-         {
-            WSException.rethrow(ex);
-         }
       }
+   }
+
+   private AbstractNettyMessage getNettyHeadersSource(final InvocationContext invContext)
+   {
+      return (AbstractNettyMessage)invContext.getProperty(Constants.NETTY_MESSAGE);
    }
 
    private void sendResponse(Endpoint endpoint, OutputStream output, boolean isFault) throws SOAPException, IOException
@@ -363,6 +401,12 @@ public class RequestHandlerImpl implements RequestHandler
       CommonMessageContext msgContext = MessageContextAssociation.peekMessageContext();
       EndpointMetaData epMetaData = msgContext.getEndpointMetaData();
       MessageAbstraction resMessage = msgContext.getMessageAbstraction();
+      
+      if (resMessage == null)
+      {
+         log.debug("Null response message");
+         return;
+      }
 
       String wsaTo = null;
 
@@ -372,12 +416,15 @@ public class RequestHandlerImpl implements RequestHandler
       {
          AddressingConstantsImpl ADDR = new AddressingConstantsImpl();
          wsaTo = outProps.getTo().getURI().toString();
-         if (wsaTo.equals(ADDR.getAnonymousURI()))
+         final AddressingFeature addressing = epMetaData.getFeature(AddressingFeature.class);
+         final boolean onlyAnonymousAllowed = addressing != null && addressing.getResponses() == AddressingFeature.Responses.ANONYMOUS;
+         if (wsaTo.equals(ADDR.getAnonymousURI()) || onlyAnonymousAllowed)
             wsaTo = null;
       }
       if (wsaTo != null)
       {
-         log.debug("Sending response to addressing destination: " + wsaTo);
+         if (log.isDebugEnabled())
+            log.debug("Sending response to addressing destination: " + wsaTo);
          SOAPMessage soapMessage = (SOAPMessage)resMessage;
          new SOAPConnectionImpl().callOneWay(soapMessage, wsaTo);
       }
@@ -392,15 +439,8 @@ public class RequestHandlerImpl implements RequestHandler
 
             SOAPEnvelope soapEnv = soapMessage.getSOAPPart().getEnvelope();
             DOMDocumentSerializer serializer = new DOMDocumentSerializer();
-            try
-            {
-               serializer.setOutputStream(output);
-               serializer.serialize(soapEnv);
-            }
-            finally
-            {
-               output.close();
-            }
+            serializer.setOutputStream(output);
+            serializer.serialize(soapEnv);
          }
          // JSON support
          else if (epMetaData.isFeatureEnabled(JsonEncodingFeature.class) && resMessage instanceof SOAPMessage)
@@ -415,14 +455,7 @@ public class RequestHandlerImpl implements RequestHandler
          }
          else
          {
-            try
-            {
-               resMessage.writeTo(output);
-            }
-            finally
-            {
-               output.close();
-            }
+            resMessage.writeTo(output);
          }
       }
    }
@@ -439,7 +472,7 @@ public class RequestHandlerImpl implements RequestHandler
          throw new IllegalStateException("Cannot obtain endpoint meta data");
 
       long beginProcessing = 0;
-      ClassLoader ctxClassLoader = Thread.currentThread().getContextClassLoader();
+      boolean debugEnabled = log.isDebugEnabled();
       try
       {
          EndpointState state = ep.getState();
@@ -450,7 +483,8 @@ public class RequestHandlerImpl implements RequestHandler
             throw new CommonSOAPFaultException(faultCode, faultString);
          }
 
-         log.debug("BEGIN handleRequest: " + ep.getName());
+         if (debugEnabled)
+            log.debug("BEGIN handleRequest: " + ep.getName());
          beginProcessing = initRequestMetrics(ep);
 
          MimeHeaders headers = (headerSource != null ? headerSource.getMimeHeaders() : null);
@@ -484,10 +518,6 @@ public class RequestHandlerImpl implements RequestHandler
 
          // debug the incomming message
          MessageTrace.traceMessage("Incoming Request Message", reqMessage);
-
-         // Set the thread context class loader
-         ClassLoader classLoader = sepMetaData.getClassLoader();
-         Thread.currentThread().setContextClassLoader(classLoader);
 
          // Get the Invoker
          ServiceEndpointInvoker epInvoker = ep.getAttachment(ServiceEndpointInvoker.class);
@@ -547,9 +577,8 @@ public class RequestHandlerImpl implements RequestHandler
             log.error("Cannot process metrics", ex);
          }
 
-         // Reset the thread context class loader
-         Thread.currentThread().setContextClassLoader(ctxClassLoader);
-         log.debug("END handleRequest: " + ep.getName());
+         if (debugEnabled)
+            log.debug("END handleRequest: " + ep.getName());
       }
    }
 
@@ -603,21 +632,24 @@ public class RequestHandlerImpl implements RequestHandler
 
    public void handleWSDLRequest(Endpoint endpoint, OutputStream outStream, InvocationContext context)
    {
-      log.debug("handleWSDLRequest: " + endpoint.getName());
+      if (log.isDebugEnabled())
+         log.debug("handleWSDLRequest: " + endpoint.getName());
 
       try
       {
-         if (context instanceof ServletRequestContext)
+         if (this.validInvocationContext(context))
          {
-            handleWSDLRequestFromServletContext(endpoint, outStream, context);
+            final String resourcePath = this.getResourcePath(context);
+            final URL requestURL = this.getRequestURL(endpoint, context);
+            this.handleWSDLRequest(endpoint, outStream, resourcePath, requestURL);
          }
          else
          {
-            String epAddress = endpoint.getAddress();
+            final String epAddress = endpoint.getAddress();
             if (epAddress == null)
                throw new IllegalArgumentException("Invalid endpoint address: " + epAddress);
 
-            URL wsdlUrl = new URL(epAddress + "?wsdl");
+            final URL wsdlUrl = new URL(epAddress + "?wsdl");
             IOUtils.copyStream(outStream, wsdlUrl.openStream());
          }
       }
@@ -629,54 +661,71 @@ public class RequestHandlerImpl implements RequestHandler
       {
          throw new WSException(ex);
       }
-      finally
-      {
-         try
-         {
-            outStream.close();
-         }
-         catch (IOException ioe)
-         {
-            throw new WSException(ioe);
-         }
-      }
    }
 
-   private void handleWSDLRequestFromServletContext(Endpoint endpoint, OutputStream outputStream, InvocationContext context) throws MalformedURLException, IOException
+   private URL getRequestURL(Endpoint endpoint, InvocationContext context) throws MalformedURLException
+   {
+      URL requestURL = null;
+
+      if (context instanceof ServletRequestContext)
+      {
+         ServletRequestContext reqContext = (ServletRequestContext)context;
+         HttpServletRequest req = reqContext.getHttpServletRequest();
+         requestURL = new URL(req.getRequestURL().toString());
+      }
+      else if (context.getProperty(Constants.NETTY_MESSAGE) != null)
+      {
+         requestURL = new URL(endpoint.getAddress());
+      }
+      
+      return requestURL;
+   }
+
+   private String getResourcePath(final InvocationContext context)
+   {
+      String resourcePath = null;
+
+      if (context instanceof ServletRequestContext)
+      {
+         ServletRequestContext reqContext = (ServletRequestContext)context;
+         HttpServletRequest req = reqContext.getHttpServletRequest();
+         resourcePath = (String)req.getParameter("resource");
+      }
+      else if (context.getProperty(Constants.NETTY_MESSAGE) != null)
+      {
+         return null;
+         // TODO: implement resourcePath = getResourcePath(nettyMessage.getUri()); // i.e. parse it from query string
+      }
+      
+      return resourcePath;
+   }
+
+   private boolean validInvocationContext(InvocationContext context)
+   {
+      if (context == null)
+         return false;
+      
+      final boolean servletInvocationContext = context instanceof ServletRequestContext;
+      final boolean nettyInvocationContext = context.getProperty(Constants.NETTY_MESSAGE) != null;
+
+      return servletInvocationContext || nettyInvocationContext;
+   }
+
+   private void handleWSDLRequest(Endpoint endpoint, OutputStream outputStream, String resPath, URL reqURL) throws MalformedURLException, IOException
    {
       ServerEndpointMetaData epMetaData = endpoint.getAttachment(ServerEndpointMetaData.class);
       if (epMetaData == null)
          throw new IllegalStateException("Cannot obtain endpoint meta data");
+      
+      //The WSDLFilePublisher should set the location to an URL 
+      URL wsdlLocation = epMetaData.getServiceMetaData().getWsdlLocation();
+      String wsdlPublishLoc = epMetaData.getServiceMetaData().getWsdlPublishLocation();
 
-      ServletRequestContext reqContext = (ServletRequestContext)context;
-      HttpServletRequest req = reqContext.getHttpServletRequest();
+      WSDLRequestHandler wsdlRequestHandler = new WSDLRequestHandler(wsdlLocation, wsdlPublishLoc, serverConfig);
+      Document document = wsdlRequestHandler.getDocumentForPath(reqURL, resPath);
 
-      // For the base document the resourcePath should be null
-      String resPath = (String)req.getParameter("resource");
-      URL reqURL = new URL(req.getRequestURL().toString());
-
-      String wsdlHost = reqURL.getProtocol() + "://" + reqURL.getHost();
-      if (reqURL.getPort() != -1)
-         wsdlHost += ":" + reqURL.getPort();
-
-      if (ServerConfig.UNDEFINED_HOSTNAME.equals(serverConfig.getWebServiceHost()) == false)
-         wsdlHost = serverConfig.getWebServiceHost();
-
-      log.debug("WSDL request, using host: " + wsdlHost);
-
-      WSDLRequestHandler wsdlRequestHandler = new WSDLRequestHandler(epMetaData);
-      Document document = wsdlRequestHandler.getDocumentForPath(reqURL, wsdlHost, resPath);
-
-      OutputStreamWriter writer = null;
-      try
-      {
-         writer = new OutputStreamWriter(outputStream);
-         new DOMWriter(writer).setPrettyprint(true).print(document.getDocumentElement());
-      }
-      finally
-      {
-         writer.close();
-      }
+      OutputStreamWriter writer = new OutputStreamWriter(outputStream);
+      new DOMWriter(writer, Constants.DEFAULT_XML_CHARSET).setPrettyprint(true).print(document);
    }
 
    private void handleException(Exception ex) throws ServletException

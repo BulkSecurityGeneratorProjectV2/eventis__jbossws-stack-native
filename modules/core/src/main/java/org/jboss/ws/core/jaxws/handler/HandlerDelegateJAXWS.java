@@ -74,7 +74,8 @@ public class HandlerDelegateJAXWS extends ServerHandlerDelegate
 
    public boolean callRequestHandlerChain(ServerEndpointMetaData sepMetaData, HandlerType type)
    {
-      log.debug("callRequestHandlerChain: " + type);
+      if (log.isDebugEnabled())
+         log.debug("callRequestHandlerChain: " + type);
 
       // Initialize the handler chain
       if (isInitialized() == false)
@@ -99,7 +100,8 @@ public class HandlerDelegateJAXWS extends ServerHandlerDelegate
 
    public boolean callResponseHandlerChain(ServerEndpointMetaData sepMetaData, HandlerType type)
    {
-      log.debug("callResponseHandlerChain: " + type);
+      if (log.isDebugEnabled())
+         log.debug("callResponseHandlerChain: " + type);
       HandlerChainExecutor executor =  getExecutor(type);
       MessageContext msgContext = (MessageContext)MessageContextAssociation.peekMessageContext();
       boolean status = (executor != null ? executor.handleMessage(msgContext) : true);
@@ -113,7 +115,8 @@ public class HandlerDelegateJAXWS extends ServerHandlerDelegate
 
    public void closeHandlerChain(ServerEndpointMetaData sepMetaData, HandlerType type)
    {
-      log.debug("closeHandlerChain");
+      if (log.isDebugEnabled())
+         log.debug("closeHandlerChain");
       HandlerChainExecutor executor =  getExecutor(type);
       MessageContext msgContext = (MessageContext)MessageContextAssociation.peekMessageContext();
       if (executor != null)
@@ -125,9 +128,11 @@ public class HandlerDelegateJAXWS extends ServerHandlerDelegate
    
    public boolean callFaultHandlerChain(ServerEndpointMetaData sepMetaData, HandlerType type, Exception ex)
    {
-      log.debug("callFaultHandlerChain: " + type);
+      if (log.isDebugEnabled())
+         log.debug("callFaultHandlerChain: " + type);
       HandlerChainExecutor executor =  getExecutor(type);
       MessageContext msgContext = (MessageContext)MessageContextAssociation.peekMessageContext();
+      ((CommonMessageContext)msgContext).setCurrentException(ex);
       boolean status = (executor != null ? executor.handleFault(msgContext, ex) : true);
 
       MessageAbstraction msg = ((CommonMessageContext)msgContext).getMessageAbstraction();
@@ -161,8 +166,8 @@ public class HandlerDelegateJAXWS extends ServerHandlerDelegate
    {
       if (type == HandlerType.ALL)
          throw new IllegalArgumentException("Invalid handler type: " + type);
-      
-      HandlerChainExecutor executor = new HandlerChainExecutor(sepMetaData, getHandlerChain(sepMetaData, type));
+
+      HandlerChainExecutor executor = new HandlerChainExecutor(sepMetaData, getHandlerChain(sepMetaData, type), true);
       if (type == HandlerType.PRE)
          preExecutor.set(executor);
       else if (type == HandlerType.ENDPOINT)

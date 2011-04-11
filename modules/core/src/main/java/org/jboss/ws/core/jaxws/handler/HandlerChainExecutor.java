@@ -27,6 +27,7 @@ import java.util.List;
 import javax.xml.soap.SOAPException;
 import javax.xml.soap.SOAPMessage;
 import javax.xml.soap.SOAPPart;
+import javax.xml.ws.ProtocolException;
 import javax.xml.ws.WebServiceException;
 import javax.xml.ws.handler.Handler;
 import javax.xml.ws.handler.LogicalHandler;
@@ -61,10 +62,14 @@ public class HandlerChainExecutor
    protected int falseIndex = -1;
    // True if the current direction is outbound
    protected Boolean isOutbound;
+   // True if this is for the server/endpoint side, used to determine client side specific
+   // conformance requirements.
+   private boolean serverSide;
 
-   public HandlerChainExecutor(EndpointMetaData epMetaData, List<Handler> unsortedChain)
+   public HandlerChainExecutor(EndpointMetaData epMetaData, List<Handler> unsortedChain, boolean serverSide)
    {
       this.epMetaData = epMetaData;
+      this.serverSide = serverSide;
 
       // Sort handler logical handlers first
       List<Handler> sortedChain = new ArrayList<Handler>();
@@ -79,7 +84,8 @@ public class HandlerChainExecutor
             sortedChain.add(handler);
       }
 
-      log.debug("Create a handler executor: " + sortedChain);
+      if (log.isDebugEnabled())
+         log.debug("Create a handler executor: " + sortedChain);
       for (Handler handler : sortedChain)
       {
          handlers.add(handler);
@@ -118,7 +124,9 @@ public class HandlerChainExecutor
 
       if (handlers.size() > 0)
       {
-         log.debug("Enter: handle" + (isOutbound ? "Out" : "In ") + "BoundMessage");
+         boolean debugEnabled = log.isDebugEnabled();
+         if (debugEnabled)
+            log.debug("Enter: handle" + (isOutbound ? "Out" : "In ") + "BoundMessage");
 
          int index = getFirstHandler();
          Handler currHandler = null;
@@ -147,9 +155,24 @@ public class HandlerChainExecutor
                   index = getNextIndex(index);
             }
          }
+         catch (ProtocolException pe)
+         {
+            // JAX-WS 2.2 specification
+            // 9.3.2.1 handleMessage chapter
+            // Throw ProtocolException or a subclass paragraph
+            doNext = false;
+            processHandlerFailure(pe);
+         }
          catch (RuntimeException ex)
          {
+            // JAX-WS 2.2 specification
+            // 9.3.2.1 handleMessage chapter
+            // Throw any other runtime exception paragraph
             doNext = false;
+            if (serverSide && !isOutbound)
+            {
+               index = index -1;
+            }
             processHandlerFailure(ex);
          }
          finally
@@ -157,8 +180,9 @@ public class HandlerChainExecutor
             // we start at this index in the response chain
             if (doNext == false)
                falseIndex = index;
-
-            log.debug("Exit: handle" + (isOutbound ? "Out" : "In ") + "BoundMessage with status: " + doNext);
+            
+            if (debugEnabled)
+               log.debug("Exit: handle" + (isOutbound ? "Out" : "In ") + "BoundMessage with status: " + doNext);
          }
       }
 
@@ -175,7 +199,9 @@ public class HandlerChainExecutor
 
       if (handlers.size() > 0)
       {
-         log.debug("Enter: handle" + (isOutbound ? "Out" : "In ") + "BoundFault");
+         boolean debugEnabled = log.isDebugEnabled();
+         if (debugEnabled)
+            log.debug("Enter: handle" + (isOutbound ? "Out" : "In ") + "BoundFault");
 
          if (msgContext instanceof SOAPMessageContext)
          {
@@ -231,7 +257,8 @@ public class HandlerChainExecutor
          }
          finally
          {
-            log.debug("Exit: handle" + (isOutbound ? "Out" : "In ") + "BoundFault with status: " + doNext);
+            if (debugEnabled)
+               log.debug("Exit: handle" + (isOutbound ? "Out" : "In ") + "BoundFault with status: " + doNext);
          }
       }
 
@@ -264,9 +291,17 @@ public class HandlerChainExecutor
    // the client MUST be passed on to the application. If the exception in question is a subclass of WebService-
    // Exception then an implementation MUST rethrow it as-is, without any additional wrapping, otherwise it
    // MUST throw a WebServiceException whose cause is set to the exception that was thrown during handler processing.
-   private void processHandlerFailure(Exception ex)
+   private void processHandlerFailure(RuntimeException ex)
    {
       log.error("Exception during handler processing", ex);
+      
+      // If this call is server side then the conformance requirement specific to
+      // clients can be avoided.
+      if (serverSide == true)
+      {
+         throw ex;
+      }
+      
       if (ex instanceof WebServiceException)
       {
          throw (WebServiceException)ex;

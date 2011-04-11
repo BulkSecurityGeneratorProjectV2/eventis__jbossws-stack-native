@@ -21,19 +21,20 @@
  */
 package org.jboss.ws.extensions.eventing.mgmt;
 
-import org.jboss.kernel.spi.registry.KernelRegistry;
-import org.jboss.kernel.spi.registry.KernelRegistryEntry;
-import org.jboss.wsf.spi.util.KernelLocator;
+import org.jboss.wsf.spi.SPIProvider;
+import org.jboss.wsf.spi.SPIProviderResolver;
+import org.jboss.wsf.spi.ioc.IoCContainerProxy;
+import org.jboss.wsf.spi.ioc.IoCContainerProxyFactory;
 
 /**
+ * Subscription manager factory impl
+ * @author richard.opalka@jboss.com
  * @author Heiko Braun, <heiko@openj.net>
- * @since 22-Mar-2006
  */
 public class SubscriptionManagerFactory
 {
    private static SubscriptionManagerFactory instance = new SubscriptionManagerFactory();
 
-   // Hide ctor
    protected SubscriptionManagerFactory()
    {
    }
@@ -43,10 +44,17 @@ public class SubscriptionManagerFactory
       return instance;
    }
 
+   /**
+    * Returns subscription manager registered in MC kernel.
+    * 
+    * @return subscription manager
+    */
    public SubscriptionManagerMBean getSubscriptionManager()
    {
-      KernelRegistry registry = KernelLocator.getKernel().getRegistry();
-      KernelRegistryEntry entry = registry.getEntry(SubscriptionManagerMBean.BEAN_NAME);
-      return (SubscriptionManagerMBean)entry.getTarget();
+      final SPIProvider spiProvider = SPIProviderResolver.getInstance().getProvider();
+      final IoCContainerProxyFactory iocContainerFactory = spiProvider.getSPI(IoCContainerProxyFactory.class);
+      final IoCContainerProxy iocContainer = iocContainerFactory.getContainer();
+      
+      return iocContainer.getBean(SubscriptionManagerMBean.BEAN_NAME, SubscriptionManagerMBean.class);
    }
 }

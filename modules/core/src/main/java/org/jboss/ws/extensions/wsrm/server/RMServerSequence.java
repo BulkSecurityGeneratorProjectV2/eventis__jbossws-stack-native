@@ -27,6 +27,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.net.URI;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -55,6 +56,7 @@ public class RMServerSequence implements RMSequence
    private String inboundId;
    private String outboundId;
    private long creationTime;
+   private URI backPort;
    private long duration;
    private Set<Long> acknowledgedOutboundMessages = new TreeSet<Long>();
    private Set<Long> receivedInboundMessages = new TreeSet<Long>();
@@ -96,9 +98,21 @@ public class RMServerSequence implements RMSequence
    
    public RMServerSequence()
    {
+      this(AddressingClientUtil.generateMessageID().toString());
+   }
+   
+   public RMServerSequence(String offeredOutboundId)
+   {
       this.sequenceId = "seq-" + System.currentTimeMillis() + "-" + System.identityHashCode(this);
       this.inboundId = AddressingClientUtil.generateMessageID().toString();
-      this.outboundId = AddressingClientUtil.generateMessageID().toString();
+      if (offeredOutboundId != null)
+      {
+         this.outboundId = offeredOutboundId;
+      }
+      else
+      {
+         this.outboundId = AddressingClientUtil.generateMessageID().toString();
+      }
       this.creationTime = System.currentTimeMillis();
       this.duration = 10 * 60 * 1000L; // 10 minutes duration
    }
@@ -120,9 +134,21 @@ public class RMServerSequence implements RMSequence
    
    public String getAcksTo()
    {
-      return null;
+      if (this.backPort != null)
+      {
+         return this.backPort.toString();
+      }
+      else
+      {
+         return null;
+      }
    }
 
+   public final void setAcksTo(URI uri)
+   {
+      this.backPort = uri;
+   }
+   
    public String getOutboundId()
    {
       return this.outboundId;
@@ -149,20 +175,23 @@ public class RMServerSequence implements RMSequence
          }
          
          this.receivedInboundMessages.add(messageId);
-         logger.debug("Inbound Sequence: " + this.inboundId + ", received message no. " + messageId);
+         if (logger.isDebugEnabled())
+            logger.debug("Inbound Sequence: " + this.inboundId + ", received message no. " + messageId);
       }
    }
 
    public final void addReceivedOutboundMessage(long messageId)
    {
       this.acknowledgedOutboundMessages.add(messageId);
-      logger.debug("Outbound Sequence: " + this.outboundId + ", message no. " + messageId + " acknowledged by server");
+      if (logger.isDebugEnabled())
+         logger.debug("Outbound Sequence: " + this.outboundId + ", message no. " + messageId + " acknowledged by server");
    }
 
    public final void ackRequested(boolean requested)
    {
       this.inboundMessageAckRequested = requested;
-      logger.debug("Inbound Sequence: " + this.inboundId + ", ack requested. Messages in the queue: " + this.receivedInboundMessages);
+      if (logger.isDebugEnabled())
+         logger.debug("Inbound Sequence: " + this.inboundId + ", ack requested. Messages in the queue: " + this.receivedInboundMessages);
    }
    
    public final long newMessageNumber()

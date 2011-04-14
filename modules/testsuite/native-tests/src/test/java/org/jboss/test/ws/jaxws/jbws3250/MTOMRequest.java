@@ -1,6 +1,6 @@
 /*
  * JBoss, Home of Professional Open Source.
- * Copyright 2009, Red Hat Middleware LLC, and individual contributors
+ * Copyright 2011, Red Hat Middleware LLC, and individual contributors
  * as indicated by the @author tags. See the copyright.txt file in the
  * distribution for a full listing of individual contributors.
  *
@@ -19,16 +19,36 @@
  * Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
  * 02110-1301 USA, or see the FSF site: http://www.fsf.org.
  */
-package org.jboss.test.ws.jaxws.jbws1582;
+package org.jboss.test.ws.jaxws.jbws3250;
 
-import javax.jws.WebMethod;
-import javax.jws.WebService;
-import javax.jws.soap.SOAPBinding;
+import javax.activation.DataHandler;
+import javax.xml.bind.annotation.XmlMimeType;
 
-@WebService (name="Endpoint")
-@SOAPBinding(style = SOAPBinding.Style.RPC)
-public interface Endpoint
+public class MTOMRequest
 {
-   @WebMethod(operationName = "echoString", action = "urn:EchoString")
-   String echo(String input);
+   private DataHandler content;
+
+   private String id;
+
+   @XmlMimeType("*/*")
+   public DataHandler getContent()
+   {
+      return content;
+   }
+
+   public void setContent(DataHandler content)
+   {
+      this.content = content;
+   }
+
+   public String getId()
+   {
+      return id;
+   }
+
+   public void setId(String id)
+   {
+      this.id = id;
+   }
+
 }

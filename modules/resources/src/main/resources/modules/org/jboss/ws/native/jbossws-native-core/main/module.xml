@@ -29,12 +29,14 @@
     </resources>
 
     <dependencies>
+        <module name="com.sun.tools.ws" services="import"/>
         <module name="com.sun.xml.bind" services="import"/>
         <module name="com.sun.xml.fastinfoset"/>
         <module name="javax.api" />
         <module name="javax.servlet.api" />
         <module name="javax.jws.api" />
         <module name="javax.mail.api" />
+        <module name="javax.wsdl4j.api" />
         <module name="javax.xml.bind.api" />
         <module name="javax.xml.stream.api" />
         <module name="javax.xml.rpc.api" />
@@ -55,6 +57,5 @@
         <module name="org.jboss.ws.native.jbossws-native-services" services="import"/>
         <module name="org.jboss.common-core" />
         <module name="org.jboss.logging" />
-        <module name="wsdl4j.wsdl4j" />
     </dependencies>
 </module>

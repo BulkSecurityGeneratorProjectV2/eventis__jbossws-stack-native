@@ -1,6 +1,6 @@
 /*
  * JBoss, Home of Professional Open Source.
- * Copyright 2009, Red Hat Middleware LLC, and individual contributors
+ * Copyright 2011, Red Hat Middleware LLC, and individual contributors
  * as indicated by the @author tags. See the copyright.txt file in the
  * distribution for a full listing of individual contributors.
  *
@@ -19,21 +19,35 @@
  * Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
  * 02110-1301 USA, or see the FSF site: http://www.fsf.org.
  */
-package org.jboss.test.ws.jaxws.jbws1582;
+package org.jboss.test.ws.jaxws.jbws3250;
 
-import javax.jws.WebService;
+import javax.activation.DataHandler;
+import javax.xml.bind.annotation.XmlMimeType;
 
-@WebService
-(
-   portName = "EndpointPort",
-   serviceName = "EndpointService",
-   wsdlLocation = "WEB-INF/wsdl/attack-service.wsdl",
-   endpointInterface = "org.jboss.test.ws.jaxws.jbws1582.Endpoint"
-)
-public class AttackedEndpointImpl
+public class MTOMResponse
 {
-   public String echo(String msg)
+   private DataHandler content;
+
+   private String response;
+
+   @XmlMimeType("*/*")
+   public DataHandler getContent()
    {
-      return msg;
+      return content;
+   }
+
+   public void setContent(DataHandler content)
+   {
+      this.content = content;
+   }
+
+   public String getResponse()
+   {
+      return response;
+   }
+
+   public void setResponse(String res)
+   {
+      this.response = res;
    }
 }

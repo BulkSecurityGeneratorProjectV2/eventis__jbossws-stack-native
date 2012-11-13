@@ -26,6 +26,7 @@ import javax.xml.rpc.Service;
 
 import junit.framework.Test;
 
+import org.jboss.wsf.test.CleanupOperation;
 import org.jboss.wsf.test.JBossWSTest;
 import org.jboss.wsf.test.JBossWSTestSetup;
 
@@ -38,10 +39,16 @@ import org.jboss.wsf.test.JBossWSTestSetup;
 public class MarshallTestCase extends JBossWSTest
 {
    private static MarshallTest port;
+   private static InitialContext iniCtx;
 
    public static Test suite()
    {
-      return new JBossWSTestSetup(MarshallTestCase.class, "jaxrpc-encoded-href.war, jaxrpc-encoded-href-client.jar");
+      return new JBossWSTestSetup(MarshallTestCase.class, "jaxrpc-encoded-href.war, jaxrpc-encoded-href-appclient.ear#jaxrpc-encoded-href-appclient.jar", new CleanupOperation() {
+         @Override
+         public void cleanUp() {
+            port = null;
+         }
+      });
    }
 
    protected void setUp() throws Exception
@@ -49,9 +56,18 @@ public class MarshallTestCase extends JBossWSTest
       super.setUp();
       if (port == null)
       {
-         InitialContext iniCtx = getInitialContext();
-         Service service = (Service)iniCtx.lookup("java:comp/env/service/TestService");
+         iniCtx = getAppclientInitialContext();
+         Service service = (Service)iniCtx.lookup("java:service/TestService");
          port = (MarshallTest)service.getPort(MarshallTest.class);
+      }
+   }
+
+   protected void tearDown() throws Exception
+   {
+      if (iniCtx != null)
+      {
+         iniCtx.close();
+         iniCtx = null;
       }
    }
 

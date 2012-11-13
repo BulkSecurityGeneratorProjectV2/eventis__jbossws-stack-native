@@ -21,23 +21,22 @@
  */
 package org.jboss.ws.metadata.umdm;
 
+import static org.jboss.ws.NativeMessages.MESSAGES;
+
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import javax.jws.soap.SOAPBinding.ParameterStyle;
 import javax.xml.namespace.QName;
 import javax.xml.rpc.ParameterMode;
 
 import org.jboss.logging.Logger;
-import org.jboss.util.NotImplementedException;
-import org.jboss.ws.WSException;
-import org.jboss.ws.core.soap.Style;
-import org.jboss.ws.core.soap.Use;
-import org.jboss.ws.extensions.wsrm.protocol.RMProvider;
-import org.jboss.wsf.common.JavaUtils;
+import org.jboss.ws.NativeLoggers;
+import org.jboss.ws.common.JavaUtils;
+import org.jboss.ws.core.soap.utils.Style;
+import org.jboss.ws.core.soap.utils.Use;
 import org.w3c.dom.Element;
 
 /**
@@ -61,11 +60,9 @@ public class OperationMetaData extends ExtensibleMetaData implements Initalizabl
    private Method javaMethod;
    private boolean oneWay;
    private String soapAction;
-   private ParameterStyle parameterStyle;
    private List<ParameterMetaData> parameters = new ArrayList<ParameterMetaData>();
    private List<FaultMetaData> faults = new ArrayList<FaultMetaData>();
    private ParameterMetaData returnParam;
-   private String documentation;
 
    public OperationMetaData(EndpointMetaData epMetaData, QName qname, String javaName)
    {
@@ -80,9 +77,9 @@ public class OperationMetaData extends ExtensibleMetaData implements Initalizabl
       this.javaName = javaName;
 
       if (qname == null)
-         throw new IllegalArgumentException("Invalid null qname argument");
+         throw MESSAGES.illegalNullArgument("qname");
       if (javaName == null)
-         throw new IllegalArgumentException("Invalid null javaName argument, for: " + qname);
+         throw MESSAGES.illegalNullArgument("javaName");
 
       String nsURI = qname.getNamespaceURI();
       String localPart = qname.getLocalPart();
@@ -124,14 +121,9 @@ public class OperationMetaData extends ExtensibleMetaData implements Initalizabl
       return epMetaData.getEncodingStyle();
    }
 
-   public ParameterStyle getParameterStyle()
+   public boolean isWrappedParameterStyle()
    {
-      return (parameterStyle != null) ? parameterStyle : epMetaData.getParameterStyle();
-   }
-
-   public void setParameterStyle(ParameterStyle parameterStyle)
-   {
-      this.parameterStyle = parameterStyle;
+      return epMetaData.isWrappedParameterStyle();
    }
 
    public boolean isRPCLiteral()
@@ -144,14 +136,9 @@ public class OperationMetaData extends ExtensibleMetaData implements Initalizabl
       return getStyle() == Style.RPC && getUse() == Use.ENCODED;
    }
 
-   public boolean isDocumentBare()
-   {
-      return getStyle() == Style.DOCUMENT && getParameterStyle() == ParameterStyle.BARE;
-   }
-
    public boolean isDocumentWrapped()
    {
-      return getStyle() == Style.DOCUMENT && getParameterStyle() == ParameterStyle.WRAPPED;
+      return getStyle() == Style.DOCUMENT && isWrappedParameterStyle();
    }
 
    public void setJavaName(String javaName)
@@ -167,7 +154,7 @@ public class OperationMetaData extends ExtensibleMetaData implements Initalizabl
    public Method getJavaMethod()
    {
       Method tmpMethod = javaMethod;
-      Class seiClass = epMetaData.getServiceEndpointInterface();
+      Class<?> seiClass = epMetaData.getServiceEndpointInterface();
       if (tmpMethod == null && seiClass != null)
       {
          for (Method method : seiClass.getMethods())
@@ -180,7 +167,7 @@ public class OperationMetaData extends ExtensibleMetaData implements Initalizabl
                if (wsMetaData.isEagerInitialized())
                {
                   if (UnifiedMetaData.isFinalRelease() == false)
-                     log.warn("Loading java method after eager initialization", new IllegalStateException());
+                     NativeLoggers.ROOT_LOGGER.loadingJavaMethodAfterEagerInit();
 
                   javaMethod = method;
                }
@@ -189,8 +176,8 @@ public class OperationMetaData extends ExtensibleMetaData implements Initalizabl
             }
          }
 
-         if ((tmpMethod == null) && (epMetaData.getConfig().getRMMetaData() == null)) // RM hack
-            throw new WSException("Cannot find java method: " + javaName);
+         if (tmpMethod == null)
+            throw MESSAGES.cannotFindJavaMethod(javaName);
       }
       return tmpMethod;
    }
@@ -400,44 +387,16 @@ return false;
       if (oneWay)
       {
          if (returnParam != null)
-            throw new WSException("OneWay operations cannot have a return parameter");
+            throw MESSAGES.onewayOperationCannotHaveReturn();
 
          if (faults.size() > 0)
-            throw new WSException("OneWay operations cannot have checked exceptions");
+            throw MESSAGES.onewayOperationCannotHaveCheckedExc();
 
          for (ParameterMetaData paramMetaData : parameters)
          {
             if (paramMetaData.getMode() != ParameterMode.IN)
-               throw new WSException("OneWay operations cannot have INOUT or OUT parameters");
+               throw MESSAGES.onewayOperationCannotHaveInOutPars();
          }
-      }
-   }
-
-   public void assertDocumentBare()
-   {
-      if (isDocumentBare())
-      {
-         int in = 0;
-         int out = 0;
-
-         for (ParameterMetaData paramMetaData : parameters)
-         {
-            if (paramMetaData.isInHeader())
-               continue;
-
-            ParameterMode mode = paramMetaData.getMode();
-            if (mode != ParameterMode.OUT)
-               in++;
-            if (mode != ParameterMode.IN)
-               out++;
-         }
-
-         if (returnParam != null && !returnParam.isInHeader())
-            out++;
-
-         if (in > 1 || out > (oneWay ? 0 : 1))
-            throw new WSException("The body of a document/literal bare message requires at most 1 input and at most 1 output (or 0 if oneway). method: " + javaName + " in: "
-                  + in + " out: " + out);
       }
    }
 
@@ -452,8 +411,7 @@ return false;
 
    public void eagerInitialize()
    {
-      // Call eagerInitialize(List<Method> unsynchronizedMethods) instead
-      throw new NotImplementedException();
+      throw new UnsupportedOperationException();
    }
    
    /**
@@ -484,8 +442,7 @@ return false;
       }
 
       // Report unsynchronized java method
-      boolean isRMMethod = RMProvider.get().getConstants().getNamespaceURI().equals(qname.getNamespaceURI());
-      if ((javaMethod == null) && (isRMMethod == false)) // RM hack
+      if (javaMethod == null)
       {
          StringBuilder errMsg = new StringBuilder("Cannot synchronize to any of these methods:");
          for (Method method : unsynchronizedMethods)
@@ -503,10 +460,6 @@ return false;
       buffer.append("\n qname=" + qname);
       buffer.append("\n javaName=" + javaName);
       buffer.append("\n style=" + getStyle() + "/" + getUse());
-      if (getStyle() == Style.DOCUMENT)
-      {
-         buffer.append("/" + getParameterStyle());
-      }
       buffer.append("\n oneWay=" + oneWay);
       buffer.append("\n soapAction=" + soapAction);
       for (ParameterMetaData param : parameters)
@@ -522,15 +475,5 @@ return false;
          buffer.append(fault);
       }
       return buffer.toString();
-   }
-
-   public String getDocumentation()
-   {
-      return documentation;
-   }
-
-   public void setDocumentation(String documentation)
-   {
-      this.documentation = documentation;
    }
 }

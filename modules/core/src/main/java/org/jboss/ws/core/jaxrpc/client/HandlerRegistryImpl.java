@@ -34,13 +34,14 @@ import javax.xml.rpc.handler.HandlerChain;
 import javax.xml.rpc.handler.HandlerInfo;
 import javax.xml.rpc.handler.HandlerRegistry;
 
-import org.jboss.logging.Logger;
+import org.jboss.ws.NativeLoggers;
+import org.jboss.ws.NativeMessages;
 import org.jboss.ws.core.jaxrpc.handler.ClientHandlerChain;
 import org.jboss.ws.metadata.umdm.EndpointMetaData;
 import org.jboss.ws.metadata.umdm.HandlerMetaDataJAXRPC;
 import org.jboss.ws.metadata.umdm.ServiceMetaData;
-import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedInitParamMetaData;
 import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedHandlerMetaData.HandlerType;
+import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedInitParamMetaData;
 
 /** 
  * Provides support for the programmatic configuration of
@@ -58,9 +59,6 @@ import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedHandlerMetaData.Handler
  */
 public class HandlerRegistryImpl implements HandlerRegistry
 {
-   // provide logging
-   private static Logger log = Logger.getLogger(HandlerRegistryImpl.class);
-   
    // Map<QName,HandlerChain> the endpoint name to a HandlerChain
    private Map<QName, HandlerChain> handlerChains = new HashMap<QName, HandlerChain>();
    // Maps the port name to a list of HandlerInfo objects
@@ -105,7 +103,7 @@ public class HandlerRegistryImpl implements HandlerRegistry
 
       EndpointMetaData epMetaData = serviceMetaData.getEndpoint(portName);
       if (epMetaData == null)
-         throw new IllegalStateException("Cannot obtain endpoint meta data for: " + portName);
+         throw NativeMessages.MESSAGES.cannotObtainEndpointMetaData(portName);
 
       epMetaData.clearHandlers();
       for (HandlerInfo info : infos)
@@ -139,7 +137,7 @@ public class HandlerRegistryImpl implements HandlerRegistry
          handler.setInitParams(initParams);
 
          epMetaData.addHandler(handler);
-         log.debug("Add handler to: " + portName + handler);
+         NativeLoggers.JAXRPC_LOGGER.addHandlerTo(portName, handler);
       }
    }
 }

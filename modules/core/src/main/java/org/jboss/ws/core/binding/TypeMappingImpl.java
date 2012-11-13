@@ -38,7 +38,10 @@ import javax.xml.rpc.encoding.SerializerFactory;
 import javax.xml.rpc.encoding.TypeMapping;
 
 import org.jboss.logging.Logger;
-import org.jboss.ws.Constants;
+import org.jboss.ws.NativeMessages;
+import org.jboss.ws.common.Constants;
+import org.jboss.ws.common.JavaUtils;
+import org.jboss.ws.common.utils.HashCodeUtil;
 import org.jboss.ws.core.jaxrpc.binding.Base64DeserializerFactory;
 import org.jboss.ws.core.jaxrpc.binding.Base64SerializerFactory;
 import org.jboss.ws.core.jaxrpc.binding.CalendarDeserializerFactory;
@@ -51,8 +54,6 @@ import org.jboss.ws.core.jaxrpc.binding.QNameDeserializerFactory;
 import org.jboss.ws.core.jaxrpc.binding.QNameSerializerFactory;
 import org.jboss.ws.core.jaxrpc.binding.SimpleDeserializerFactory;
 import org.jboss.ws.core.jaxrpc.binding.SimpleSerializerFactory;
-import org.jboss.ws.core.utils.HashCodeUtil;
-import org.jboss.wsf.common.JavaUtils;
 
 /**
  * This is the representation of a type mapping.
@@ -147,9 +148,9 @@ public abstract class TypeMappingImpl implements TypeMapping
    private void registerInternal(Class javaType, IQName xmlType, SerializerFactory sf, DeserializerFactory df)
    {
       if (javaType == null)
-         throw new IllegalArgumentException("javaType cannot be null for: " + xmlType);
+         throw NativeMessages.MESSAGES.illegalNullArgument("javaType");
       if (xmlType == null)
-         throw new IllegalArgumentException("xmlType cannot be null for: " + javaType);
+         throw NativeMessages.MESSAGES.illegalNullArgument("xmlType");
 
       KeyPair kPair = new KeyPair(xmlType, javaType);
       FactoryPair fPair = new FactoryPair(sf, df);
@@ -705,7 +706,7 @@ public abstract class TypeMappingImpl implements TypeMapping
 
       public boolean equals(Object object) {
          if(!(object instanceof IQName))
-            throw new IllegalArgumentException("Cannot compare IQName to " + object);
+            throw NativeMessages.MESSAGES.cannotCompareIQNameTo(object);
 
          IQName iqn = (IQName)object;
          return (iqn.namespace == this.namespace && iqn.localPart == this.localPart);

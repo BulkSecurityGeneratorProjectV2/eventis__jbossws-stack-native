@@ -38,6 +38,8 @@ import javax.xml.soap.SOAPMessage;
 
 import junit.framework.Test;
 
+import org.jboss.ws.core.soap.utils.SOAPUtils;
+import org.jboss.wsf.test.CleanupOperation;
 import org.jboss.wsf.test.JBossWSTest;
 import org.jboss.wsf.test.JBossWSTestSetup;
 
@@ -54,12 +56,17 @@ import org.jboss.wsf.test.JBossWSTestSetup;
 public class JBWS425TestCase extends JBossWSTest
 {
    private static final String SOAP_ACTION = "\"urn:some-soap-action\"";
-
+   private static InitialContext iniCtx;
    private static Hello endpoint;
 
    public static Test suite() throws Exception
    {
-      return new JBossWSTestSetup(JBWS425TestCase.class, "jaxrpc-jbws425.war, jaxrpc-jbws425-client.jar");
+      return new JBossWSTestSetup(JBWS425TestCase.class, "jaxrpc-jbws425.war, jaxrpc-jbws425-appclient.ear#jaxrpc-jbws425-appclient.jar", new CleanupOperation() {
+         @Override
+         public void cleanUp() {
+            endpoint = null;
+         }
+      });
    }
 
    public void setUp() throws Exception
@@ -67,10 +74,20 @@ public class JBWS425TestCase extends JBossWSTest
       super.setUp();
       if (endpoint == null)
       {
-         InitialContext iniCtx = getInitialContext();
-         Service service = (Service)iniCtx.lookup("java:comp/env/service/HelloService");
+         iniCtx = getAppclientInitialContext();
+         Service service = (Service)iniCtx.lookup("java:service/HelloService");
          endpoint = (Hello)service.getPort(Hello.class);
       }
+   }
+
+   protected void tearDown() throws Exception
+   {
+      if (iniCtx != null)
+      {
+         iniCtx.close();
+         iniCtx = null;
+      }
+      super.tearDown();
    }
 
    public void testClientActionFromWSDL() throws Exception
@@ -104,7 +121,7 @@ public class JBWS425TestCase extends JBossWSTest
          "  </soapenv:Body>" +
          "</soapenv:Envelope>";
 
-      MessageFactory msgFactory = MessageFactory.newInstance();
+      MessageFactory msgFactory = SOAPUtils.newSOAP11MessageFactory();
       SOAPConnection con = SOAPConnectionFactory.newInstance().createConnection();
 
       MimeHeaders mimeHeaders = new MimeHeaders();

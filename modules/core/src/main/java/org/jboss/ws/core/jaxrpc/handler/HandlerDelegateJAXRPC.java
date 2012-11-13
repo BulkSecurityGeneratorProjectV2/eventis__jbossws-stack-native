@@ -26,23 +26,21 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Observable;
 import java.util.Set;
 
 import javax.xml.namespace.QName;
 import javax.xml.rpc.handler.HandlerChain;
 import javax.xml.rpc.handler.HandlerInfo;
 
-import org.jboss.logging.Logger;
+import org.jboss.ws.NativeLoggers;
 import org.jboss.ws.core.RoleSource;
 import org.jboss.ws.core.server.ServerHandlerDelegate;
-import org.jboss.ws.core.soap.MessageContextAssociation;
-import org.jboss.ws.extensions.xop.XOPContext;
+import org.jboss.ws.core.soap.utils.MessageContextAssociation;
 import org.jboss.ws.metadata.umdm.HandlerMetaData;
 import org.jboss.ws.metadata.umdm.HandlerMetaDataJAXRPC;
 import org.jboss.ws.metadata.umdm.ServerEndpointMetaData;
-import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedInitParamMetaData;
 import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedHandlerMetaData.HandlerType;
+import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedInitParamMetaData;
 
 /** Delegates to JAXRPC handlers
  *
@@ -51,9 +49,6 @@ import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedHandlerMetaData.Handler
  */
 public class HandlerDelegateJAXRPC extends ServerHandlerDelegate implements RoleSource
 {
-   // provide logging
-   private static Logger log = Logger.getLogger(HandlerDelegateJAXRPC.class);
-
    // This endpoints handler chain
    private ServerHandlerChain preHandlerChain;
    // This endpoints handler chain
@@ -68,7 +63,6 @@ public class HandlerDelegateJAXRPC extends ServerHandlerDelegate implements Role
    public HandlerDelegateJAXRPC(ServerEndpointMetaData sepMetaData)
    {
       super(sepMetaData);
-      sepMetaData.registerConfigObserver(this);
    }
 
    /**
@@ -126,12 +120,7 @@ public class HandlerDelegateJAXRPC extends ServerHandlerDelegate implements Role
       else if (type == HandlerType.POST)
          handlerChain = postHandlerChain;
 
-      boolean status = (handlerChain != null ? handlerChain.handleResponse(msgContext) : true);
-
-      if (type == HandlerType.ENDPOINT)
-         XOPContext.visitAndRestoreXOPData();
-
-      return status;
+      return handlerChain != null ? handlerChain.handleResponse(msgContext) : true;
    }
 
    public boolean callFaultHandlerChain(ServerEndpointMetaData sepMetaData, HandlerType type, Exception ex)
@@ -146,12 +135,7 @@ public class HandlerDelegateJAXRPC extends ServerHandlerDelegate implements Role
       else if (type == HandlerType.POST)
          handlerChain = postHandlerChain;
 
-      boolean status = (handlerChain != null ? handlerChain.handleFault(msgContext) : true);
-
-      if (type == HandlerType.ENDPOINT)
-         XOPContext.visitAndRestoreXOPData();
-
-      return status;
+      return handlerChain != null ? handlerChain.handleFault(msgContext) : true;
    }
 
    public void closeHandlerChain(ServerEndpointMetaData sepMetaData, HandlerType type)
@@ -186,8 +170,7 @@ public class HandlerDelegateJAXRPC extends ServerHandlerDelegate implements Role
          hConfig.put(HandlerType.class.getName(), jaxrpcMetaData.getHandlerType());
          HandlerInfo info = new HandlerInfo(hClass, hConfig, headerArr);
 
-         if (log.isDebugEnabled())
-            log.debug("Adding server side handler to service '" + sepMetaData.getPortName() + "': " + info);
+         NativeLoggers.ROOT_LOGGER.addingServerSideHandler(sepMetaData.getPortName(), info);
          hInfos.add(info);
       }
 
@@ -196,9 +179,6 @@ public class HandlerDelegateJAXRPC extends ServerHandlerDelegate implements Role
 
    private void initHandlerChain(ServerEndpointMetaData sepMetaData, List<HandlerInfo> hInfos, Set<String> handlerRoles, HandlerType type)
    {
-      if (log.isDebugEnabled())
-         log.debug("Init handler chain with [" + hInfos.size() + "] handlers");
-
       ServerHandlerChain handlerChain = new ServerHandlerChain(hInfos, handlerRoles, type);
       if (type == HandlerType.PRE)
          preHandlerChain = handlerChain;
@@ -224,9 +204,5 @@ public class HandlerDelegateJAXRPC extends ServerHandlerDelegate implements Role
    public Set<QName> getHeaders()
    {
       return headers;
-   }
-
-   public void update(Observable observable, Object object)
-   {
    }
 }

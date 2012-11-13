@@ -26,7 +26,8 @@ import java.util.Map;
 import javax.xml.namespace.QName;
 
 import org.apache.xerces.xs.XSModel;
-import org.jboss.ws.Constants;
+import org.jboss.ws.NativeMessages;
+import org.jboss.ws.common.Constants;
 import org.jboss.ws.metadata.wsdl.WSDLUtils;
 import org.jboss.ws.metadata.wsdl.xmlschema.JBossXSModel;
 import org.jboss.ws.metadata.wsdl.xsd.SchemaUtils;
@@ -65,7 +66,7 @@ public class JavaToXSDHelper
              String targetNamespace)
    {
       if(targetNamespace == null)
-         throw new IllegalArgumentException("Illegal Null Argument: targetNamespace");
+         throw NativeMessages.MESSAGES.javaToXSDIsNull("targetNamespace");
 
       XSModel xsmodel = creator.getXSModel();
       if(xsmodel == null) creator.setXSModel(new JBossXSModel());

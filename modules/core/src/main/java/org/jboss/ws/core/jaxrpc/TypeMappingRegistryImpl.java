@@ -24,12 +24,11 @@ package org.jboss.ws.core.jaxrpc;
 import java.util.HashMap;
 import java.util.Map;
 
-import javax.xml.rpc.JAXRPCException;
 import javax.xml.rpc.encoding.TypeMapping;
 import javax.xml.rpc.encoding.TypeMappingRegistry;
 
-import org.jboss.util.NotImplementedException;
-import org.jboss.ws.Constants;
+import org.jboss.ws.NativeMessages;
+import org.jboss.ws.common.Constants;
 import org.jboss.ws.core.binding.TypeMappingImpl;
 
 /**
@@ -80,7 +79,7 @@ public class TypeMappingRegistryImpl implements TypeMappingRegistry
     */
    public void registerDefault(TypeMapping mapping)
    {
-      throw new NotImplementedException();
+      throw new UnsupportedOperationException();
    }
 
    /**
@@ -89,7 +88,7 @@ public class TypeMappingRegistryImpl implements TypeMappingRegistry
     */
    public TypeMapping createTypeMapping()
    {
-      throw new NotImplementedException();
+      throw new UnsupportedOperationException();
    }
 
    /**
@@ -125,7 +124,7 @@ public class TypeMappingRegistryImpl implements TypeMappingRegistry
     */
    public TypeMapping register(String encodingStyleURI, TypeMapping mapping)
    {
-      throw new NotImplementedException();
+      throw new UnsupportedOperationException();
    }
 
    /**
@@ -136,7 +135,7 @@ public class TypeMappingRegistryImpl implements TypeMappingRegistry
     */
    public TypeMapping unregisterTypeMapping(String encodingStyleURI)
    {
-      throw new NotImplementedException();
+      throw new UnsupportedOperationException();
    }
 
    /**
@@ -151,13 +150,13 @@ public class TypeMappingRegistryImpl implements TypeMappingRegistry
     */
    public boolean removeTypeMapping(TypeMapping mapping)
    {
-      throw new NotImplementedException();
+      throw new UnsupportedOperationException();
    }
 
    /** Assert the literal encoding style */
    private void assertEncodingStyle(String encURI)
    {
       if (Constants.URI_LITERAL_ENC.equals(encURI) == false && Constants.URI_SOAP11_ENC.equals(encURI) == false)
-         throw new JAXRPCException("Unsupported encoding style: " + encURI);
+         throw NativeMessages.MESSAGES.unsupportedEncodingStyle(encURI);
    }
 }

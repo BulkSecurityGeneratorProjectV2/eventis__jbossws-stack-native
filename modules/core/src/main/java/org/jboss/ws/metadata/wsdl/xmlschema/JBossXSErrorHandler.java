@@ -25,6 +25,7 @@ import org.apache.xerces.xni.XNIException;
 import org.apache.xerces.xni.parser.XMLErrorHandler;
 import org.apache.xerces.xni.parser.XMLParseException;
 import org.jboss.logging.Logger;
+import org.jboss.ws.NativeMessages;
 
 /**
  *  Error Handler for the Xerces schema parser default implementation
@@ -57,7 +58,7 @@ public class JBossXSErrorHandler implements XMLErrorHandler
    public void error(String domain, String key, XMLParseException xexp) throws XNIException
    {
       if ("src-include.2.1".equals(key))
-         throw new XNIException("Parser should stop:", xexp);
+         throw NativeMessages.MESSAGES.parserShouldStopKeyValueIs("src-include.2.1", xexp);
 
       String errorMsg = getFormattedString(domain, key, xexp);
       log.error(errorMsg);
@@ -75,7 +76,7 @@ public class JBossXSErrorHandler implements XMLErrorHandler
    {
       String errorMsg = getFormattedString(domain, key, xexp);
       log.error(errorMsg);
-      throw new XNIException("Parser should stop: " + errorMsg, xexp);
+      throw NativeMessages.MESSAGES.parserShouldStop(errorMsg, xexp);
    }
 
    /**

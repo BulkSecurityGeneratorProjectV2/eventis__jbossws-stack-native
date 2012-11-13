@@ -24,6 +24,7 @@ package org.jboss.ws.core.soap.attachment;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Iterator;
+import java.util.ResourceBundle;
 
 import javax.activation.DataHandler;
 import javax.mail.MessagingException;
@@ -32,8 +33,10 @@ import javax.mail.internet.MimeMultipart;
 import javax.xml.soap.AttachmentPart;
 import javax.xml.soap.MimeHeader;
 import javax.xml.soap.SOAPException;
+import javax.xml.soap.SOAPMessage;
 
-import org.jboss.ws.core.soap.SOAPMessageImpl;
+import org.jboss.ws.core.soap.BundleUtils;
+import org.jboss.ws.core.soap.utils.CIDGenerator;
 
 /**
  * MultipartRelatedEncoder encodes a SOAPMessage
@@ -44,10 +47,11 @@ import org.jboss.ws.core.soap.SOAPMessageImpl;
  */
 public abstract class MultipartRelatedEncoder
 {
-   protected SOAPMessageImpl soapMessage;
+   private static final ResourceBundle bundle = BundleUtils.getBundle(MultipartRelatedEncoder.class);
+   protected SOAPMessage soapMessage;
    protected MimeMultipart multipart;
 
-   public MultipartRelatedEncoder(SOAPMessageImpl soapMessage) throws SOAPException
+   public MultipartRelatedEncoder(SOAPMessage soapMessage) throws SOAPException
    {
       this.soapMessage = soapMessage;
    }
@@ -80,8 +84,7 @@ public abstract class MultipartRelatedEncoder
 
          if (mimePart.getHeader(MimeConstants.CONTENT_ID) == null)
          {
-            CIDGenerator cidGenerator = soapMessage.getCidGenerator();
-            mimePart.setHeader(MimeConstants.CONTENT_ID, cidGenerator.generateFromCount());
+            mimePart.setHeader(MimeConstants.CONTENT_ID, CIDGenerator.generateFromCount());
          }
 
          // TODO - Binary encoding is the most efficient, however, some transports (old mail servers)
@@ -113,7 +116,7 @@ public abstract class MultipartRelatedEncoder
    public void writeTo(OutputStream os) throws IOException
    {
       if (multipart == null)
-         throw new IOException("No data to write because encoding failed on construction");
+         throw new IOException(BundleUtils.getMessage(bundle, "NO_DATA_TO_WRITE"));
 
       try
       {

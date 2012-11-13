@@ -24,14 +24,15 @@ package org.jboss.ws.metadata.accessor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
+import org.jboss.ws.NativeMessages;
 import org.jboss.ws.WSException;
 import org.jboss.ws.metadata.umdm.WrappedParameter;
 
 final class ReflectiveFieldAccessorFactory implements AccessorFactory
 {
-   private final Class clazz;
+   private final Class<?> clazz;
 
-   ReflectiveFieldAccessorFactory(Class clazz)
+   ReflectiveFieldAccessorFactory(Class<?> clazz)
    {
       this.clazz = clazz;
    }
@@ -55,15 +56,13 @@ final class ReflectiveFieldAccessorFactory implements AccessorFactory
          }
    
          if (Modifier.isStatic(field.getModifiers()))
-            throw new WSException("Field can not be static: " + fieldName);
+            throw NativeMessages.MESSAGES.fieldCannotBeStatic(fieldName);
    
          return new ReflectiveFieldAccessor(field);
       }
       catch (Throwable t)
       {
-         WSException ex = new WSException("Error accessing field: " + fieldName + t.getClass().getSimpleName() + ": " + t.getMessage());
-         ex.setStackTrace(t.getStackTrace());
-         throw ex;
+         throw new WSException(t);
       }
    }
 }

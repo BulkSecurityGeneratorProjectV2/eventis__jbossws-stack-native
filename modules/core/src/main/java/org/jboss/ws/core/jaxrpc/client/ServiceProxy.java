@@ -21,6 +21,11 @@
  */
 package org.jboss.ws.core.jaxrpc.client;
 
+import java.io.Externalizable;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
+import java.io.Serializable;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -33,6 +38,8 @@ import javax.xml.rpc.JAXRPCException;
 import javax.xml.rpc.Service;
 
 import org.jboss.logging.Logger;
+import org.jboss.ws.NativeLoggers;
+import org.jboss.ws.NativeMessages;
 
 /**
  * This is the proxy that implements the service interface .
@@ -42,23 +49,28 @@ import org.jboss.logging.Logger;
  * @author Thomas.Diesler@jboss.org
  * @since 15-May-2004
  */
-public class ServiceProxy implements InvocationHandler
+public class ServiceProxy implements InvocationHandler, Serializable, Externalizable
 {
    // provide logging
    private static final Logger log = Logger.getLogger(ServiceProxy.class);
 
    // The underlying jaxrpc service
    private ServiceImpl jaxrpcService;
+   private Class siClass;
 
    // The methods from java.lang.Object
-   private List objectMethods = new ArrayList();
+   private transient List objectMethods = new ArrayList();
    // The methods from javax.xml.rpc.Service
-   private List jaxrpcServiceMethods = new ArrayList();
+   private transient List jaxrpcServiceMethods = new ArrayList();
    // The methods from the service interface, in case of javax.xml.rpc.Service it is empty
-   private List serviceInterfaceMethods = new ArrayList();
+   private transient List serviceInterfaceMethods = new ArrayList();
 
    // The cached getPort method
-   private Method getPortMethod;
+   private transient Method getPortMethod;
+
+   public ServiceProxy() {
+       // for deserialization only
+   }
 
    /**
     * Construct a client side service proxy.
@@ -71,26 +83,30 @@ public class ServiceProxy implements InvocationHandler
    public ServiceProxy(ServiceImpl service, Class siClass)
    {
       this.jaxrpcService = service;
+      this.siClass = siClass;
+      init();
+   }
 
-      // initialize java.lang.Object methods
-      objectMethods.addAll(Arrays.asList(Object.class.getMethods()));
+   private void init() {
+       // initialize java.lang.Object methods
+       objectMethods.addAll(Arrays.asList(Object.class.getMethods()));
 
-      // initialize javax.xml.rpc.Service methods
-      jaxrpcServiceMethods.addAll(Arrays.asList(ServiceExt.class.getMethods()));
+       // initialize javax.xml.rpc.Service methods
+       jaxrpcServiceMethods.addAll(Arrays.asList(ServiceExt.class.getMethods()));
 
-      // initialize SI methods
-      if (siClass.getName().equals("javax.xml.rpc.Service") == false)
-         serviceInterfaceMethods.addAll(Arrays.asList(siClass.getDeclaredMethods()));
+       // initialize SI methods
+       if (siClass.getName().equals("javax.xml.rpc.Service") == false)
+          serviceInterfaceMethods.addAll(Arrays.asList(siClass.getDeclaredMethods()));
 
-      // initialize special ws4ee methods
-      try
-      {
-         getPortMethod = Service.class.getMethod("getPort", new Class[]{Class.class});
-      }
-      catch (NoSuchMethodException e)
-      {
-         throw new JAXRPCException(e.toString());
-      }
+       // initialize special ws4ee methods
+       try
+       {
+          getPortMethod = Service.class.getMethod("getPort", new Class[]{Class.class});
+       }
+       catch (NoSuchMethodException e)
+       {
+          throw new JAXRPCException(e.toString());
+       }
    }
 
    /**
@@ -135,7 +151,7 @@ public class ServiceProxy implements InvocationHandler
             return retObj;
          }
 
-         throw new JAXRPCException("Don't know how to invoke: " + method);
+         throw NativeMessages.MESSAGES.dontKnowHowToInvoke(method);
       }
       catch (Exception e)
       {
@@ -153,7 +169,19 @@ public class ServiceProxy implements InvocationHandler
       if (ex instanceof InvocationTargetException)
          th = ((InvocationTargetException)ex).getTargetException();
 
-      log.error("Service error", th);
+      NativeLoggers.JAXRPC_LOGGER.jaxRpcServiceError(th);
       throw th;
    }
+
+   public void writeExternal(final ObjectOutput out) throws IOException {
+       out.writeObject(jaxrpcService);
+       out.writeObject(siClass);
+   }
+
+   public void readExternal(final ObjectInput in) throws IOException, ClassNotFoundException {
+       jaxrpcService = (ServiceImpl)in.readObject();
+       siClass = (Class)in.readObject();
+       init();
+   }
+
 }

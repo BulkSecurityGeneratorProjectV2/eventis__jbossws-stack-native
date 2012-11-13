@@ -31,13 +31,13 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.jboss.logging.Logger;
-import org.jboss.ws.WSException;
+import org.jboss.ws.NativeMessages;
 import org.jboss.ws.metadata.umdm.ServerEndpointMetaData;
+import org.jboss.wsf.spi.SPIProvider;
+import org.jboss.wsf.spi.SPIProviderResolver;
 import org.jboss.wsf.spi.deployment.Endpoint;
 import org.jboss.wsf.spi.management.EndpointRegistry;
 import org.jboss.wsf.spi.management.EndpointRegistryFactory;
-import org.jboss.wsf.spi.SPIProvider;
-import org.jboss.wsf.spi.SPIProviderResolver;
 
 /**
  * A servlet that reports the serviceURL for a given service ID.
@@ -75,11 +75,11 @@ public class PortComponentLinkServlet extends HttpServlet
    {
       String pcLink = req.getParameter("pcLink");
       if (pcLink == null)
-         throw new IllegalArgumentException("Cannot obtain request parameter 'pcLink'");
+         throw NativeMessages.MESSAGES.illegalNullArgument("pcLink");
 
       Endpoint endpoint = epRegistry.resolve( new PortComponentResolver(pcLink) );
       if (endpoint == null)
-         throw new WSException("Cannot resolve port-component-link: " + pcLink);
+         throw NativeMessages.MESSAGES.cannotResolvePortComponentLink(pcLink);
 
       res.setContentType("text/plain");
       PrintWriter out = res.getWriter();

@@ -98,14 +98,14 @@ class SecurityActions
                   }
                   catch (Throwable e)
                   {
-                     throw new RuntimeException("Error setting context classloader", e);
+                     throw new RuntimeException(e);
                   }
                }
             });
          }
          catch (PrivilegedActionException e)
          {
-            throw new RuntimeException("Error running privileged action", e.getCause());
+            throw new RuntimeException(e.getCause());
          }
       }
    }

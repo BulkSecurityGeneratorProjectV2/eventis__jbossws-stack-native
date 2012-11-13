@@ -21,17 +21,16 @@
  */
 package org.jboss.ws.core.soap;
 
+import java.util.ResourceBundle;
+
 import javax.xml.soap.SOAPConnection;
 import javax.xml.soap.SOAPException;
 import javax.xml.soap.SOAPMessage;
-import javax.xml.ws.addressing.EndpointReference;
 
-import org.jboss.ws.core.MessageAbstraction;
-import org.jboss.ws.core.client.EndpointInfo;
+import org.jboss.ws.core.soap.BundleUtils;
 import org.jboss.ws.core.client.HTTPRemotingConnection;
 import org.jboss.ws.core.client.RemoteConnection;
 import org.jboss.ws.core.client.SOAPProtocolConnectionHTTP;
-import org.jboss.ws.core.client.SOAPProtocolConnectionJMS;
 
 /**
  * SOAPConnection implementation
@@ -43,6 +42,7 @@ import org.jboss.ws.core.client.SOAPProtocolConnectionJMS;
  */
 public class SOAPConnectionImpl extends SOAPConnection
 {
+   private static final ResourceBundle bundle = BundleUtils.getBundle(SOAPConnectionImpl.class);
 
    private RemoteConnection remotingConnection;
 
@@ -59,10 +59,9 @@ public class SOAPConnectionImpl extends SOAPConnection
    public SOAPMessage call(SOAPMessage reqMessage, Object endpoint) throws SOAPException
    {
       if (reqMessage == null)
-         throw new IllegalArgumentException("Given SOAPMessage cannot be null");
+         throw new IllegalArgumentException(BundleUtils.getMessage(bundle, "SOAPMESSAGE_CANNOT_BE_NULL"));
 
-      MessageAbstraction resMessage = callInternal(reqMessage, endpoint, false);
-      return (SOAPMessage)resMessage;
+      return callInternal(reqMessage, endpoint, false);
    }
 
    /**
@@ -71,8 +70,7 @@ public class SOAPConnectionImpl extends SOAPConnection
    @Override
    public SOAPMessage get(Object endpoint) throws SOAPException
    {
-      MessageAbstraction resMessage = callInternal(null, endpoint, false);
-      return (SOAPMessage)resMessage;
+      return callInternal(null, endpoint, false);
    }
 
    /**
@@ -82,39 +80,15 @@ public class SOAPConnectionImpl extends SOAPConnection
    public SOAPMessage callOneWay(SOAPMessage reqMessage, Object endpoint) throws SOAPException
    {
       if (reqMessage == null)
-         throw new IllegalArgumentException("Given SOAPMessage cannot be null");
+         throw new IllegalArgumentException(BundleUtils.getMessage(bundle, "SOAPMESSAGE_CANNOT_BE_NULL"));
 
-      MessageAbstraction resMessage = callInternal(reqMessage, endpoint, true);
-      return (SOAPMessage)resMessage;
+      return callInternal(reqMessage, endpoint, true);
    }
 
    private RemoteConnection getRemotingConnection(Object endpoint)
    {
       if (endpoint == null)
-         throw new IllegalArgumentException("Given endpoint cannot be null");
-
-      String targetAddress = null;
-      if (endpoint instanceof EndpointInfo)
-      {
-         targetAddress = ((EndpointInfo) endpoint).getTargetAddress();
-      }
-      else if (endpoint instanceof EndpointReference)
-      {
-         EndpointReference epr = (EndpointReference) endpoint;
-         targetAddress = epr.getAddress().toString();
-      }
-      else
-      {
-         targetAddress = endpoint.toString();
-      }
-
-      if (targetAddress.startsWith("jms"))
-      {
-         if (false == (remotingConnection instanceof SOAPProtocolConnectionJMS))
-         {
-            remotingConnection = new SOAPProtocolConnectionJMS();
-         }
-      }
+         throw new IllegalArgumentException(BundleUtils.getMessage(bundle, "ENDPOINT_CANNOT_BE_NULL"));
 
       return remotingConnection;
    }
@@ -129,18 +103,18 @@ public class SOAPConnectionImpl extends SOAPConnection
       {
          HTTPRemotingConnection conn = (HTTPRemotingConnection) remotingConnection;
          if (conn.isClosed())
-            throw new SOAPException("SOAPConnection is already closed");
+            throw new SOAPException(BundleUtils.getMessage(bundle, "SOAPCONNECTION_IS_ALREADY_CLOSED"));
 
          conn.setClosed(true);
       }
    }
 
-   private MessageAbstraction callInternal(SOAPMessage reqMessage, Object endpoint, boolean oneway) throws SOAPException
+   private SOAPMessage callInternal(SOAPMessage reqMessage, Object endpoint, boolean oneway) throws SOAPException
    {
       try
       {
          remotingConnection = getRemotingConnection(endpoint);
-         MessageAbstraction resMessage = remotingConnection.invoke((SOAPMessageImpl)reqMessage, endpoint, oneway);
+         SOAPMessage resMessage = remotingConnection.invoke((SOAPMessageImpl)reqMessage, endpoint, oneway);
          return resMessage;
       }
       catch (Exception ex)

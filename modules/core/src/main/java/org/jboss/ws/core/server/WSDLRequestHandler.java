@@ -29,11 +29,9 @@ import java.net.URISyntaxException;
 import java.net.URL;
 
 import org.jboss.logging.Logger;
-import org.jboss.wsf.common.DOMUtils;
-import org.jboss.wsf.spi.SPIProvider;
-import org.jboss.wsf.spi.SPIProviderResolver;
+import org.jboss.ws.NativeMessages;
+import org.jboss.ws.common.DOMUtils;
 import org.jboss.wsf.spi.management.ServerConfig;
-import org.jboss.wsf.spi.management.ServerConfigFactory;
 import org.w3c.dom.Attr;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -64,6 +62,8 @@ public class WSDLRequestHandler
 
    public WSDLRequestHandler(URL wsdlLocationFromMetadata, String wsdlPublishLocationFromMetadata, ServerConfig config)
    {
+      if (wsdlLocationFromMetadata == null)
+         throw NativeMessages.MESSAGES.illegalNullArgument("wsdlLocationFromMetadata");
       this.wsdlLocation = wsdlLocationFromMetadata;
       this.wsdlPublishLoc = wsdlPublishLocationFromMetadata;
       this.config = config;
@@ -104,10 +104,6 @@ public class WSDLRequestHandler
    private Document getDocumentForPath(URL reqURL, String wsdlHost, boolean rewriteUsingCalledURL, String resPath) throws IOException
    {
       Document wsdlDoc;
-
-      if (wsdlLocation == null)
-         throw new IllegalStateException("Cannot obtain wsdl location");
-
       // get the root wsdl
       if (resPath == null)
       {
@@ -142,9 +138,7 @@ public class WSDLRequestHandler
             log.debug("Importing resource file: " + impResourceFile.getCanonicalPath());
 
          String wsdlLocFilePath = wsdlLocFile.getParentFile().getCanonicalPath();
-         SPIProvider spiProvider = SPIProviderResolver.getInstance().getProvider();
-         ServerConfig serverConfig = spiProvider.getSPI(ServerConfigFactory.class).getServerConfig();
-         String wsdlDataLoc = serverConfig.getServerDataDir().getCanonicalPath() + File.separatorChar + "wsdl";
+         String wsdlDataLoc = config.getServerDataDir().getCanonicalPath() + File.separatorChar + "wsdl";
 
          //allow wsdl file's parent or server's data/wsdl or overriden wsdl publish directories only
          String resourceAbsPath = impResourceFile.getCanonicalPath(); 
@@ -158,7 +152,7 @@ public class WSDLRequestHandler
          }
          else
          {
-            throw new IOException("Access to '" + resourceAbsPath + "' resource is not allowed");
+            throw NativeMessages.MESSAGES.accessIsNotAllowed(resourceAbsPath);
          }
       }
 
@@ -317,13 +311,13 @@ public class WSDLRequestHandler
          }
          else
          {
-            log.info("Skipping rewrite of non-http address: " + orgLocation);
+            log.debug("Skipping rewrite of non-http address: " + orgLocation);
             return false;
          }
       }
       catch (URISyntaxException e)
       {
-         log.error("Skipping rewrite of invalid address: " + orgLocation, e);
+         log.debug("Skipping rewrite of non-http address: " + orgLocation);
          return false;
       }
    }

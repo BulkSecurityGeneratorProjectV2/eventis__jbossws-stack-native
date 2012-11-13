@@ -21,6 +21,8 @@
  */
 package org.jboss.ws.tools.wsdl;
 
+import static org.jboss.ws.NativeMessages.MESSAGES;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -74,10 +76,14 @@ import javax.wsdl.extensions.soap12.SOAP12Operation;
 import javax.xml.namespace.QName;
 
 import org.jboss.logging.Logger;
-import org.jboss.ws.Constants;
-import org.jboss.ws.core.soap.Style;
-import org.jboss.ws.core.utils.JBossWSEntityResolver;
-import org.jboss.ws.core.utils.ResourceURL;
+import org.jboss.ws.NativeLoggers;
+import org.jboss.ws.NativeMessages;
+import org.jboss.ws.common.Constants;
+import org.jboss.ws.common.DOMUtils;
+import org.jboss.ws.common.DOMWriter;
+import org.jboss.ws.common.utils.JBossWSEntityResolver;
+import org.jboss.ws.common.utils.ResourceURL;
+import org.jboss.ws.core.soap.utils.Style;
 import org.jboss.ws.metadata.wsdl.Extendable;
 import org.jboss.ws.metadata.wsdl.WSDLBinding;
 import org.jboss.ws.metadata.wsdl.WSDLBindingMessageReference;
@@ -98,18 +104,15 @@ import org.jboss.ws.metadata.wsdl.WSDLMIMEPart;
 import org.jboss.ws.metadata.wsdl.WSDLProperty;
 import org.jboss.ws.metadata.wsdl.WSDLRPCPart;
 import org.jboss.ws.metadata.wsdl.WSDLRPCSignatureItem;
+import org.jboss.ws.metadata.wsdl.WSDLRPCSignatureItem.Direction;
 import org.jboss.ws.metadata.wsdl.WSDLSOAPHeader;
 import org.jboss.ws.metadata.wsdl.WSDLService;
 import org.jboss.ws.metadata.wsdl.WSDLTypes;
 import org.jboss.ws.metadata.wsdl.WSDLUtils;
 import org.jboss.ws.metadata.wsdl.XSModelTypes;
-import org.jboss.ws.metadata.wsdl.WSDLRPCSignatureItem.Direction;
 import org.jboss.ws.metadata.wsdl.xmlschema.JBossXSModel;
 import org.jboss.ws.metadata.wsdl.xsd.SchemaUtils;
 import org.jboss.ws.tools.JavaToXSD;
-import org.jboss.wsf.common.DOMUtils;
-import org.jboss.wsf.common.DOMWriter;
-import org.jboss.wsf.common.addressing.AddressingConstants;
 import org.w3c.dom.Attr;
 import org.w3c.dom.Element;
 import org.w3c.dom.NamedNodeMap;
@@ -189,6 +192,7 @@ public class WSDL11Reader
       return destWsdl;
    }
 
+   @SuppressWarnings("unchecked")
    private void processTopLevelElements(Definition srcWsdl)
    {
       String targetNS = srcWsdl.getTargetNamespace();
@@ -277,7 +281,7 @@ public class WSDL11Reader
    {
       log.trace("processUnreachableBindings");
 
-      Iterator it = getAllDefinedBindings(srcWsdl).values().iterator();
+      Iterator<?> it = getAllDefinedBindings(srcWsdl).values().iterator();
       while (it.hasNext())
       {
          Binding srcBinding = (Binding)it.next();
@@ -317,88 +321,11 @@ public class WSDL11Reader
          if (extElement instanceof UnknownExtensibilityElement)
          {
             UnknownExtensibilityElement uee = (UnknownExtensibilityElement)extElement;
-            boolean understood = false;
-            understood = understood || processPolicyElements(uee, dest);
-            understood = understood || processEPR(uee, dest);
-            //add processing of further extensibility element types below
-            
-            if (!understood)
-            {
-               processNotUnderstoodExtesibilityElement(uee, dest);
-            }
+            processNotUnderstoodExtesibilityElement(uee, dest);
          }
       }
    }
 
-   /**
-    * Process the provided extensibility element looking for policies or policy references.
-    * Returns true if the provided element is policy related, false otherwise.
-    * 
-    * @param extElement
-    * @param dest
-    * @return
-    */
-   private boolean processPolicyElements(UnknownExtensibilityElement extElement, Extendable dest)
-   {
-      boolean result = false;
-      Element srcElement = extElement.getElement();
-      final boolean is200409PolicyNamespace = Constants.URI_WS_POLICY.equals(srcElement.getNamespaceURI());
-      final boolean is200702PolicyNamespace = WSDLGenerator.WSP_NS.equals(srcElement.getNamespaceURI());
-      final boolean isPolicyNamespace = is200702PolicyNamespace || is200409PolicyNamespace;
-      
-      if (isPolicyNamespace)
-      {
-         //copy missing namespaces from the source element to our element
-         Element element = (Element)srcElement.cloneNode(true);
-         copyMissingNamespaceDeclarations(element, srcElement);
-         if (element.getLocalName().equals("Policy"))
-         {
-            WSDLExtensibilityElement el = new WSDLExtensibilityElement(Constants.WSDL_ELEMENT_POLICY, element);
-            el.setRequired("true".equalsIgnoreCase(element.getAttribute("required")));
-            dest.addExtensibilityElement(el);
-            result = true;
-         }
-         else if (element.getLocalName().equals("PolicyReference"))
-         {
-            WSDLExtensibilityElement el = new WSDLExtensibilityElement(Constants.WSDL_ELEMENT_POLICYREFERENCE, element);
-            el.setRequired("true".equalsIgnoreCase(element.getAttribute("required")));
-            dest.addExtensibilityElement(el);
-            result = true;
-         }
-      }
-      
-      return result;
-   }
-   
-   /**
-    * Process the provided extensibility element looking for UsingAddressing.
-    * Returns true if the provided element is UsingAddressing, false otherwise.
-    * 
-    * @param extElement
-    * @param dest
-    * @return
-    */
-   private boolean processEPR(UnknownExtensibilityElement extElement, Extendable dest)
-   {
-      final Element srcElement = extElement.getElement();
-      final boolean isWSANamespace = AddressingConstants.Core.NS.equals(srcElement.getNamespaceURI());
-      final boolean isEPRLocalName = AddressingConstants.Core.Elements.ENDPOINTREFERENCE.equals(srcElement.getLocalName());
-      boolean result = false;
-
-      if (isWSANamespace && isEPRLocalName)
-      {
-         Element element = (Element) srcElement.cloneNode(true);
-         copyMissingNamespaceDeclarations(element, srcElement);
-
-         WSDLExtensibilityElement el = new WSDLExtensibilityElement(Constants.WSDL_ELEMENT_EPR, element);
-         el.setRequired(true);
-         dest.addExtensibilityElement(el);
-         result = true;
-      }
-
-      return result;
-   }
-   
    private void processNotUnderstoodExtesibilityElement(UnknownExtensibilityElement extElement, Extendable dest)
    {
       Element element = (Element)extElement.getElement().cloneNode(true);
@@ -454,7 +381,7 @@ public class WSDL11Reader
                }
                else
                {
-                  throw new IllegalArgumentException("Unsuported schema element: " + localname);
+                  throw NativeMessages.MESSAGES.unsupportedSchemaElement(wsdlLoc, localname);
                }
             }
             catch (IOException e)
@@ -551,13 +478,13 @@ public class WSDL11Reader
    private void processSchemaImport(WSDLTypes types, URL wsdlLoc, Element importEl, Map<URL, URL> publishedLocations) throws IOException, WSDLException
    {
       if (wsdlLoc == null)
-         throw new IllegalArgumentException("Cannot process import, parent location not set");
+         throw MESSAGES.cannotProcessImportParentLocationSetToNull();
 
       log.trace("processSchemaImport: " + wsdlLoc);
 
       String location = getOptionalAttribute(importEl, "schemaLocation");
       if (location == null)
-         throw new IllegalArgumentException("schemaLocation is null for xsd:import");
+         throw MESSAGES.xsdImportNullSchemaLocation();
 
       URL locationURL = getLocationURL(wsdlLoc, location);
       if (!publishedLocations.containsKey(locationURL))
@@ -573,10 +500,7 @@ public class WSDL11Reader
    private void processSchemaInclude(WSDLTypes types, URL wsdlLoc, Element schemaEl, Map<URL, URL> publishedLocations) throws IOException, WSDLException
    {
       if (wsdlLoc == null)
-         throw new IllegalArgumentException("Cannot process iclude, parent location not set");
-
-      if (wsdlLoc == null)
-         throw new IllegalArgumentException("Cannot process include, parent location not set");
+         throw MESSAGES.cannotProcessIncludeParentLocationSetToNull();
 
       log.trace("processSchemaInclude: " + wsdlLoc);
 
@@ -621,7 +545,7 @@ public class WSDL11Reader
          Element includeEl = (Element)it.next();
          String location = getOptionalAttribute(includeEl, "schemaLocation");
          if (location == null)
-            throw new IllegalArgumentException("schemaLocation is null for xsd:include");
+            throw MESSAGES.xsdIncludeNullSchemaLocation();
 
          URL locationURL = getLocationURL(wsdlLoc, location);
          Element rootElement = DOMUtils.parse(new ResourceURL(locationURL).openStream());
@@ -660,7 +584,7 @@ public class WSDL11Reader
    private void handleSchemaImports(Element schemaEl, URL parentURL) throws WSDLException, IOException
    {
       if (parentURL == null)
-         throw new IllegalArgumentException("Cannot process import, parent location not set");
+         throw MESSAGES.cannotProcessImportParentLocationSetToNull();
 
       Iterator it = DOMUtils.getChildElements(schemaEl, new QName(Constants.NS_SCHEMA_XSD, "import"));
       while (it.hasNext())
@@ -689,7 +613,7 @@ public class WSDL11Reader
                   }
                   catch (SAXException se)
                   {
-                     log.error(se.getMessage(), se);
+                     log.error("", se);
                   }
                }
                if (importedSchema == null)
@@ -750,27 +674,6 @@ public class WSDL11Reader
       {
          WSDLInterface destInterface = new WSDLInterface(destWsdl, qname);
 
-         //policy extensions
-         QName policyURIsProp = (QName)srcPortType.getExtensionAttribute(Constants.WSDL_ATTRIBUTE_WSP_POLICYURIS);
-         if (policyURIsProp != null && !"".equalsIgnoreCase(policyURIsProp.getLocalPart()))
-         {
-            destInterface.addProperty(new WSDLProperty(Constants.WSDL_PROPERTY_POLICYURIS, policyURIsProp.getLocalPart()));
-         }
-
-         // eventing extensions
-         QName eventSourceProp = (QName)srcPortType.getExtensionAttribute(Constants.WSDL_ATTRIBUTE_WSE_EVENTSOURCE);
-         if (eventSourceProp != null && eventSourceProp.getLocalPart().equals(Boolean.TRUE.toString()))
-         {
-            destInterface.addProperty(new WSDLProperty(Constants.WSDL_PROPERTY_EVENTSOURCE, eventSourceProp.getLocalPart()));
-         }
-         
-         // documentation
-         Element documentationElement = srcPortType.getDocumentationElement();
-         if (documentationElement != null && documentationElement.getTextContent() != null)
-         {
-            destInterface.setDocumentationElement(new WSDLDocumentation(documentationElement.getTextContent()));
-         }
-
          destWsdl.addInterface(destInterface);
 
          processPortTypeOperations(srcWsdl, destInterface, srcPortType, destBinding);
@@ -820,13 +723,6 @@ public class WSDL11Reader
 
          log.trace("processOperationInput: " + srcMessage.getQName());
 
-         QName wsaAction = (QName)wsdlOperationInput.getExtensionAttribute(Constants.WSDL_ATTRIBUTE_WSA_ACTION);
-         if (wsaAction != null)
-            umdmOperation.addProperty(new WSDLProperty(Constants.WSDL_PROPERTY_ACTION_IN, wsaAction.getLocalPart()));
-         wsaAction = (QName)wsdlOperationInput.getExtensionAttribute(AddressingConstants.Metadata.Attributes.ACTION_QNAME);
-         if (wsaAction != null)
-            umdmOperation.addProperty(new WSDLProperty(Constants.WSDL_PROPERTY_ACTION_IN, wsaAction.getLocalPart()));
-         
          List<String> paramOrder = (List<String>)wsdlOperation.getParameterOrdering();
          if (paramOrder != null)
          {
@@ -922,12 +818,6 @@ public class WSDL11Reader
       log.trace("processOperationOutput: " + wsdlMessage.getQName());
 
       umdmOperation.setPattern(Constants.WSDL20_PATTERN_IN_OUT);
-      QName wsaAction = (QName)wsdlOperationOutput.getExtensionAttribute(Constants.WSDL_ATTRIBUTE_WSA_ACTION);
-      if (wsaAction != null)
-         umdmOperation.addProperty(new WSDLProperty(Constants.WSDL_PROPERTY_ACTION_OUT, wsaAction.getLocalPart()));
-      wsaAction = (QName)wsdlOperationOutput.getExtensionAttribute(AddressingConstants.Metadata.Attributes.ACTION_QNAME);
-      if (wsaAction != null)
-         umdmOperation.addProperty(new WSDLProperty(Constants.WSDL_PROPERTY_ACTION_OUT, wsaAction.getLocalPart()));
 
       List<String> paramOrder = (List<String>)wsdlOperation.getParameterOrdering();
       if (paramOrder != null)
@@ -1013,12 +903,6 @@ public class WSDL11Reader
       QName messageName = wsdlMessage.getQName();
 
       WSDLInterfaceOperationOutfault opOutFault = new WSDLInterfaceOperationOutfault(umdmOperation);
-      QName wsaAction = (QName)wsdlFault.getExtensionAttribute(Constants.WSDL_ATTRIBUTE_WSA_ACTION);
-      if (wsaAction != null)
-         opOutFault.addProperty(new WSDLProperty(Constants.WSDL_PROPERTY_ACTION_FAULT, wsaAction.getLocalPart()));
-      wsaAction = (QName)wsdlFault.getExtensionAttribute(AddressingConstants.Metadata.Attributes.ACTION_QNAME);
-      if (wsaAction != null)
-         opOutFault.addProperty(new WSDLProperty(Constants.WSDL_PROPERTY_ACTION_FAULT, wsaAction.getLocalPart()));
 
       opOutFault.addProperty(new WSDLProperty(Constants.WSDL_PROPERTY_MESSAGE_NAME_FAULT, faultName));
       
@@ -1036,7 +920,7 @@ public class WSDL11Reader
       else
       {
          umdmFault.setElement(messageName);
-         log.warn("Unsupported fault message part in message: " + messageName);
+         NativeLoggers.ROOT_LOGGER.unsupportedFaultMessagePartInMessage(messageName);
       }
 
       // Add the fault to the interface
@@ -1093,7 +977,7 @@ public class WSDL11Reader
       }
 
       if (xmlName == null)
-         throw new IllegalStateException("Cannot name for wsdl part: " + srcPart);
+         throw MESSAGES.cannotFindNameForWSDLPart(srcPart);
 
       xmlName = destWsdl.registerQName(xmlName);
       String key = srcMessage.getQName() + "->" + srcPart.getName();
@@ -1188,7 +1072,7 @@ public class WSDL11Reader
             }
             else if ("binding".equals(elementType.getLocalPart()))
             {
-               log.warn("Unsupported binding: " + elementType);
+               NativeLoggers.ROOT_LOGGER.unsupportedBinding(elementType);
                bindingType = elementType.getNamespaceURI();
             }
          }
@@ -1644,7 +1528,7 @@ public class WSDL11Reader
          if (encStyleList != null)
          {
             if (encStyleList.size() > 1)
-               log.warn("Multiple encoding styles not supported: " + encStyleList);
+               NativeLoggers.ROOT_LOGGER.multipleEncodingStyleNotSupported(encStyleList);
 
             if (encStyleList.size() > 0)
             {
@@ -1662,7 +1546,7 @@ public class WSDL11Reader
       {
          String setStyle = destBindingOperation.getEncodingStyle();
          if (encStyle.equals(setStyle) == false)
-            log.warn("Encoding style '" + encStyle + "' not supported for: " + destBindingOperation.getRef());
+            NativeLoggers.ROOT_LOGGER.encodingStyleNotSupported(encStyle, destBindingOperation.getRef());
 
          destBindingOperation.setEncodingStyle(encStyle);
       }
@@ -1761,7 +1645,7 @@ public class WSDL11Reader
          }
          else if ("address".equals(elementType.getLocalPart()))
          {
-            log.warn("Unprocessed extension element: " + elementType);
+            NativeLoggers.ROOT_LOGGER.unprocessedWSDLExtensionElement(elementType);
          }
       }
 

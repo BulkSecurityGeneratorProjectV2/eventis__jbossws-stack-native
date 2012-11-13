@@ -21,6 +21,8 @@
  */
 package org.jboss.ws.tools.wsdl;
 
+import static org.jboss.ws.NativeMessages.MESSAGES;
+
 import java.io.IOException;
 import java.io.Writer;
 import java.util.Arrays;
@@ -31,40 +33,29 @@ import javax.wsdl.WSDLException;
 import javax.wsdl.factory.WSDLFactory;
 import javax.xml.namespace.QName;
 
-import org.jboss.ws.Constants;
-import org.jboss.ws.WSException;
-import org.jboss.ws.metadata.wsdl.Extendable;
+import org.jboss.ws.common.Constants;
+import org.jboss.ws.common.DOMUtils;
+import org.jboss.ws.common.DOMWriter;
 import org.jboss.ws.metadata.wsdl.WSDLBinding;
 import org.jboss.ws.metadata.wsdl.WSDLBindingMessageReference;
 import org.jboss.ws.metadata.wsdl.WSDLBindingOperation;
 import org.jboss.ws.metadata.wsdl.WSDLBindingOperationInput;
 import org.jboss.ws.metadata.wsdl.WSDLBindingOperationOutput;
 import org.jboss.ws.metadata.wsdl.WSDLDefinitions;
-import org.jboss.ws.metadata.wsdl.WSDLDocumentation;
 import org.jboss.ws.metadata.wsdl.WSDLEndpoint;
-import org.jboss.ws.metadata.wsdl.WSDLExtensibilityElement;
 import org.jboss.ws.metadata.wsdl.WSDLImport;
 import org.jboss.ws.metadata.wsdl.WSDLInterface;
-import org.jboss.ws.metadata.wsdl.WSDLInterfaceFault;
 import org.jboss.ws.metadata.wsdl.WSDLInterfaceMessageReference;
 import org.jboss.ws.metadata.wsdl.WSDLInterfaceOperation;
 import org.jboss.ws.metadata.wsdl.WSDLInterfaceOperationInput;
 import org.jboss.ws.metadata.wsdl.WSDLInterfaceOperationOutfault;
 import org.jboss.ws.metadata.wsdl.WSDLInterfaceOperationOutput;
-import org.jboss.ws.metadata.wsdl.WSDLProperty;
 import org.jboss.ws.metadata.wsdl.WSDLRPCPart;
 import org.jboss.ws.metadata.wsdl.WSDLRPCSignatureItem;
+import org.jboss.ws.metadata.wsdl.WSDLRPCSignatureItem.Direction;
 import org.jboss.ws.metadata.wsdl.WSDLSOAPHeader;
 import org.jboss.ws.metadata.wsdl.WSDLService;
-import org.jboss.ws.metadata.wsdl.WSDLRPCSignatureItem.Direction;
-import org.jboss.wsf.common.DOMUtils;
-import org.jboss.wsf.common.DOMWriter;
-import org.jboss.wsf.common.addressing.AddressingConstants;
-import org.w3c.dom.Attr;
 import org.w3c.dom.Element;
-import org.w3c.dom.NamedNodeMap;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 
 /**
  * A WSDL Writer that writes a WSDL 1.1 file. It works off
@@ -173,80 +164,11 @@ public class WSDL11Writer extends WSDLWriter
       writtenFaultMessages.clear();
 
       appendTypes(builder, namespace);
-      appendUnknownExtensibilityElements(builder, wsdl);
       appendMessages(builder, namespace);
       appendInterfaces(builder, namespace);
       appendBindings(builder, namespace);
       appendServices(builder, namespace);
       builder.append("</definitions>");
-   }
-   
-   protected void appendUnknownExtensibilityElements(StringBuilder builder, Extendable extendable)
-   {
-      for (WSDLExtensibilityElement ext : extendable.getAllExtensibilityElements())
-      {
-         appendPolicyElements(builder, ext);
-         appendAddressingPolicyElements(builder, ext);
-         appendJAXWSCustomizationElements(builder, ext);
-         //add processing of further extensibility element types below
-      }
-   }
-   
-   private void appendPolicyElements(StringBuilder builder, WSDLExtensibilityElement extElem)
-   {
-      if (Constants.WSDL_ELEMENT_POLICY.equalsIgnoreCase(extElem.getUri()) ||
-            Constants.WSDL_ELEMENT_POLICYREFERENCE.equalsIgnoreCase(extElem.getUri()))
-      {
-         appendElementSkippingKnownNs(builder, extElem.getElement());
-      }
-   }
-   
-   private void appendAddressingPolicyElements(StringBuilder builder, WSDLExtensibilityElement extElem)
-   {
-      if (WSDLGenerator.WSP_NS.equalsIgnoreCase(extElem.getUri()))
-      {
-         appendElementSkippingKnownNs(builder, extElem.getElement());
-      }
-   }
-   
-   private void appendJAXWSCustomizationElements(StringBuilder builder, WSDLExtensibilityElement extElem)
-   {
-      if (Constants.URI_JAXWS_WSDL_CUSTOMIZATIONS.equalsIgnoreCase(extElem.getUri()))
-      {
-         appendElementSkippingKnownNs(builder, extElem.getElement());
-      }
-   }
-   
-   private void appendElementSkippingKnownNs(StringBuilder builder, Element el)
-   {
-      builder.append("<"+el.getNodeName());
-      NamedNodeMap attributes = el.getAttributes();
-      for (int i = 0; i < attributes.getLength(); i++)
-      {
-         Attr attr = (Attr)attributes.item(i);
-         if (attr.getName().startsWith("xmlns:") && attr.getValue()!=null)
-         {
-            String prefix = attr.getName().substring(6);
-            if (attr.getValue().equalsIgnoreCase(wsdl.getNamespaceURI(prefix)))
-               continue;
-         }
-         builder.append(" "+attr.getName()+"='"+attr.getValue()+"'");
-      }
-      builder.append(">");
-      NodeList childrenList = el.getChildNodes();
-      for (int i=0; i<childrenList.getLength(); i++)
-      {
-         Node node = childrenList.item(i);
-         if (node instanceof Element)
-         {
-            appendElementSkippingKnownNs(builder, (Element)node);
-         }
-         else
-         {
-            builder.append(DOMWriter.printNode(node, false));
-         }
-      }
-      builder.append("</"+el.getNodeName()+">");
    }
    
    protected void appendMessages(StringBuilder buffer, String namespace)
@@ -280,7 +202,6 @@ public class WSDL11Writer extends WSDLWriter
       buffer.append("<message name='" + interfaceName + "_" + opname + "' >");
       for (WSDLInterfaceOperationInput input : operation.getInputs())
       {
-         appendUnknownExtensibilityElements(buffer, input); //only one may contain extensibility elements
          appendMessageParts(buffer, input);
       }
       buffer.append("</message>");
@@ -325,7 +246,7 @@ public class WSDL11Writer extends WSDLWriter
       String namespaceURI = name.getNamespaceURI();
       String prefix = wsdl.getPrefix(namespaceURI);
       if (prefix == null)
-         throw new WSException("Prefix not bound for namespace: " + namespaceURI);
+         throw MESSAGES.prefixNotBound(namespaceURI);
 
       return prefix + ":" + name.getLocalPart();
    }
@@ -380,7 +301,7 @@ public class WSDL11Writer extends WSDLWriter
          bindingReferences = bindingOperation.getOutputs();
 
       if (bindingReferences.length > 1)
-         throw new IllegalArgumentException("WSDl 1.1 only supports In-Only, and In-Out MEPS, more than reference input found");
+         throw MESSAGES.wsd11MultipleRefInput();
 
       if (bindingReferences.length == 1)
          return bindingReferences[0];
@@ -398,21 +319,7 @@ public class WSDL11Writer extends WSDLWriter
             continue;
 
          buffer.append("<portType name='" + intf.getName().getLocalPart() + "'");
-         WSDLProperty policyProp = intf.getProperty(Constants.WSDL_PROPERTY_POLICYURIS);
-         if (policyProp != null)
-         {
-            String prefix = wsdl.getPrefix(Constants.URI_WS_POLICY);
-            buffer.append(" ");
-            buffer.append(prefix);
-            buffer.append(":");
-            buffer.append(Constants.WSDL_ATTRIBUTE_WSP_POLICYURIS.getLocalPart());
-            buffer.append("='");
-            buffer.append(policyProp.getValue());
-            buffer.append("'");
-         }
          buffer.append(">");
-         appendDocumentation(buffer, intf.getDocumentationElement());
-         appendUnknownExtensibilityElements(buffer, intf);
          appendPortOperations(buffer, intf);
          buffer.append("</portType>");
       }
@@ -437,7 +344,6 @@ public class WSDL11Writer extends WSDLWriter
    protected void appendPortOperations(StringBuilder buffer, WSDLInterface intf)
    {
       String prefix = wsdl.getPrefix(intf.getName().getNamespaceURI());
-      String wsamPrefix = wsdl.getPrefix(AddressingConstants.Metadata.NS);
 
       WSDLInterfaceOperation[] operations = intf.getSortedOperations();
       for (int i = 0; i < operations.length; i++)
@@ -454,8 +360,6 @@ public class WSDL11Writer extends WSDLWriter
           
          }
          buffer.append(">");
-         appendDocumentation(buffer, operation.getDocumentationElement());
-         appendUnknownExtensibilityElements(buffer, operation);
 
          String opname = operation.getName().getLocalPart();
          String interfaceName = operation.getWsdlInterface().getName().getLocalPart();
@@ -466,10 +370,6 @@ public class WSDL11Writer extends WSDLWriter
          {
             buffer.append("<input message='" + msgEl + "'>").append("</input>");
          }
-         else
-         {
-            buffer.append("<input message='" + msgEl + "' " + wsamPrefix + ":" + AddressingConstants.Metadata.Attributes.ACTION + "='" + inputAction + "'/>");
-         }
 
          if (! Constants.WSDL20_PATTERN_IN_ONLY.equals(operation.getPattern()))
          {
@@ -477,10 +377,6 @@ public class WSDL11Writer extends WSDLWriter
             if (outputAction == null)
             {
                buffer.append("<output message='" + msgEl + "Response'>").append("</output>");
-            }
-            else
-            {
-               buffer.append("<output message='" + msgEl + "Response' " + wsamPrefix + ":" + AddressingConstants.Metadata.Attributes.ACTION + "='" + outputAction + "'/>");
             }
          }
 
@@ -494,28 +390,12 @@ public class WSDL11Writer extends WSDLWriter
                buffer.append("<fault  message='" + prefix + ":" + element.getLocalPart());
                buffer.append("' name='" + element.getLocalPart() + "'/>");
             }
-            else
-            {
-               buffer.append("<fault  message='" + prefix + ":" + element.getLocalPart());
-               buffer.append("' name='" + element.getLocalPart() + "' ");
-               buffer.append(wsamPrefix + ":" + AddressingConstants.Metadata.Attributes.ACTION + "='" + faultAction + "'/>");
-            }
          }
 
          buffer.append("</operation>");
       }
    }
    
-   protected void appendDocumentation(StringBuilder buffer, WSDLDocumentation documentation)
-   {
-      if (documentation != null && documentation.getContent() != null)
-      {
-         buffer.append("<documentation>");
-         buffer.append(documentation.getContent());
-         buffer.append("</documentation>");
-      }
-   }
-
    protected void appendBindings(StringBuilder buffer, String namespace)
    {
       WSDLBinding[] bindings = wsdl.getBindings();
@@ -527,11 +407,10 @@ public class WSDL11Writer extends WSDLWriter
          buffer.append("<binding name='" + binding.getName().getLocalPart() + "' type='" + getQNameRef(binding.getInterfaceName()) + "'>");
          //TODO:Need to derive the WSDLStyle from the Style attribute of InterfaceOperation
          if (wsdlStyle == null)
-            throw new IllegalArgumentException("WSDL Style is null (should be rpc or document");
+            throw MESSAGES.wsdlStyleNull();
          String style = "rpc";
          if (wsdlStyle.equals(Constants.DOCUMENT_LITERAL))
             style = "document";
-         appendUnknownExtensibilityElements(buffer, binding);
          
          // The value of the REQUIRED transport attribute (of type xs:anyURI) indicates which transport of SOAP this binding corresponds to. 
          // The URI value "http://schemas.xmlsoap.org/soap/http" corresponds to the HTTP binding. 
@@ -555,20 +434,18 @@ public class WSDL11Writer extends WSDLWriter
 
          WSDLInterface wsdlInterface = wsdl.getInterface(interfaceName);
          if (wsdlInterface == null)
-            throw new WSException("WSDL Interface should not be null");
+            throw MESSAGES.wsdlInterfaceNull();
          WSDLInterfaceOperation interfaceOperation = wsdlInterface.getOperation(operation.getRef());
 
          buffer.append("<operation name='" + interfaceOperation.getName().getLocalPart() + "'>");
          String soapAction = (operation.getSOAPAction() != null ? operation.getSOAPAction() : "");
-         appendUnknownExtensibilityElements(buffer, operation);
          buffer.append("<" + soapPrefix + ":operation soapAction=\"" + soapAction + "\"/>");
 
          WSDLBindingOperationInput[] inputs = operation.getInputs();
          if (inputs.length != 1)
-            throw new WSException("WSDl 1.1 only supports In-Only, and In-Out MEPS.");
+            throw MESSAGES.wsd11UnsupportedMEP();
 
          buffer.append("<input>");
-         appendUnknownExtensibilityElements(buffer, inputs[0]);
          appendSOAPBinding(buffer, wsdlInterface, operation, inputs);
          buffer.append("</input>");
 
@@ -666,7 +543,6 @@ public class WSDL11Writer extends WSDLWriter
          if (!namespace.equals(service.getName().getNamespaceURI()))
             continue;
          buffer.append("<service name='" + service.getName().getLocalPart() + "'>");
-         appendUnknownExtensibilityElements(buffer, service);
          WSDLEndpoint[] endpoints = service.getEndpoints();
          int lenend = endpoints.length;
          for (int j = 0; j < lenend; j++)
@@ -688,7 +564,6 @@ public class WSDL11Writer extends WSDLWriter
       String ebname = prefix + ":" + endpointBinding.getLocalPart();
       buffer.append("<port name='" + name + "' binding='" + ebname + "'>");
       buffer.append("<" + soapPrefix + ":address location='" + endpoint.getAddress() + "'/>");
-      appendUnknownExtensibilityElements(buffer, endpoint);
       buffer.append("</port>");
    }
 }

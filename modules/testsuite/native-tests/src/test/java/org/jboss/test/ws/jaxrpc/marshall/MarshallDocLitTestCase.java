@@ -31,6 +31,7 @@ import javax.xml.rpc.Service;
 import junit.framework.Test;
 
 import org.jboss.test.ws.jaxrpc.marshall.types.JavaBean;
+import org.jboss.wsf.test.CleanupOperation;
 import org.jboss.wsf.test.JBossWSTestSetup;
 
 /**
@@ -43,11 +44,17 @@ public class MarshallDocLitTestCase extends MarshallTest
 {
    // The static endpoint cache
    private static StandardTypes port;
+   private static InitialContext iniCtx;
 
    /** Deploy the test ear */
    public static Test suite() throws Exception
    {
-      return new JBossWSTestSetup(MarshallDocLitTestCase.class, "jaxrpc-marshall-doclit.war, jaxrpc-marshall-doclit-client.jar");
+      return new JBossWSTestSetup(MarshallDocLitTestCase.class, "jaxrpc-marshall-doclit.war, jaxrpc-marshall-doclit-appclient.ear#jaxrpc-marshall-doclit-appclient.jar", new CleanupOperation() {
+         @Override
+         public void cleanUp() {
+            port = null;
+         }
+      });
    }
 
    protected void setUp() throws Exception
@@ -56,9 +63,18 @@ public class MarshallDocLitTestCase extends MarshallTest
 
       if (port == null)
       {
-         InitialContext iniCtx = getInitialContext();
-         Service service = (Service)iniCtx.lookup("java:comp/env/service/StandardTypes");
+         iniCtx = getAppclientInitialContext();
+         Service service = (Service)iniCtx.lookup("java:service/StandardTypes");
          port = (StandardTypes)service.getPort(StandardTypes.class);         
+      }
+   }
+
+   protected void tearDown() throws Exception
+   {
+      if (iniCtx != null)
+      {
+         iniCtx.close();
+         iniCtx = null;
       }
    }
 

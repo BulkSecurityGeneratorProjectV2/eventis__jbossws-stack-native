@@ -21,16 +21,13 @@
  */
 package org.jboss.ws.tools.wsdl;
 
-import org.jboss.logging.Logger;
-import org.jboss.ws.Constants;
-import org.jboss.ws.core.utils.JBossWSEntityResolver;
-import org.jboss.ws.core.utils.ResourceURL;
-import org.jboss.ws.metadata.wsdl.WSDLDefinitions;
-import org.jboss.ws.metadata.wsdl.WSDLException;
-import org.jboss.wsf.common.DOMUtils;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.xml.sax.EntityResolver;
+import java.io.InputStream;
+import java.io.StringWriter;
+import java.net.ConnectException;
+import java.net.URL;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 
 import javax.wsdl.Definition;
 import javax.wsdl.factory.WSDLFactory;
@@ -39,13 +36,17 @@ import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
-import java.io.InputStream;
-import java.io.StringWriter;
-import java.net.ConnectException;
-import java.net.URL;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import org.jboss.logging.Logger;
+import org.jboss.ws.NativeMessages;
+import org.jboss.ws.common.Constants;
+import org.jboss.ws.common.utils.JBossWSEntityResolver;
+import org.jboss.ws.common.utils.ResourceURL;
+import org.jboss.ws.metadata.wsdl.WSDLDefinitions;
+import org.jboss.ws.metadata.wsdl.WSDLException;
+import org.jboss.wsf.spi.classloading.ClassLoaderProvider;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.xml.sax.EntityResolver;
 
 /**
  * A factory that creates a <code>WSDLDefinitions</code> object from an URL.
@@ -97,12 +98,12 @@ public class WSDLDefinitionsFactory
    public WSDLDefinitions parse(URL wsdlLocation) throws WSDLException
    {
       if (wsdlLocation == null)
-         throw new IllegalArgumentException("URL cannot be null");
+         throw NativeMessages.MESSAGES.cannotParsedWsdlWithNullURL();
 
       if (log.isDebugEnabled())
          log.debug("parse: " + wsdlLocation.toExternalForm());
 
-      EntityResolver entityResolver = new JBossWSEntityResolver();
+      EntityResolver entityResolver = new JBossWSEntityResolver(ClassLoaderProvider.getDefaultProvider().getServerJAXRPCIntegrationClassLoader());
       WSDLDefinitions wsdlDefinitions = null;
       try
       {
@@ -115,11 +116,11 @@ public class WSDLDefinitionsFactory
             wsdlReader.setFeature("javax.wsdl.verbose", false);
 
             // Setup reader features
-            Iterator it = features.entrySet().iterator();
+            Iterator<?> it = features.entrySet().iterator();
 
             while (it.hasNext())
             {
-               Map.Entry entry = (Map.Entry)it.next();
+               Map.Entry<?,?> entry = (Map.Entry<?, ?>)it.next();
                String key = (String)entry.getKey();
                Boolean flag = (Boolean)entry.getValue();
                wsdlReader.setFeature(key, flag.booleanValue());
@@ -131,7 +132,7 @@ public class WSDLDefinitionsFactory
          }
          else
          {
-            throw new WSDLException("Invalid default namespace: " + defaultNamespace);
+            throw NativeMessages.MESSAGES.invalidDefaultWSDLNamespace(defaultNamespace);
          }
 
          if (log.isTraceEnabled())
@@ -184,11 +185,11 @@ public class WSDLDefinitionsFactory
       }
       catch (ConnectException ex)
       {
-         throw new WSDLException("Cannot connect to: " + wsdlLocation);
+         throw NativeMessages.MESSAGES.cannotParseWsdlFrom(wsdlLocation, ex);
       }
       catch (Exception ex)
       {
-         throw new WSDLException("Cannot parse wsdlLocation: " + wsdlLocation, ex);
+         throw NativeMessages.MESSAGES.cannotParseWsdlFrom(wsdlLocation, ex);
       }
    }
 

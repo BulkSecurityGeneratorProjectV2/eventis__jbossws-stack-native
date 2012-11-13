@@ -39,7 +39,9 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamSource;
 
 import org.jboss.logging.Logger;
-import org.jboss.wsf.spi.util.ServiceLoader;
+import org.jboss.ws.NativeMessages;
+import org.jboss.ws.api.util.ServiceLoader;
+import org.jboss.ws.core.soap.utils.Style;
 import org.w3c.dom.Attr;
 import org.w3c.dom.CDATASection;
 import org.w3c.dom.Comment;
@@ -167,7 +169,7 @@ public class SOAPPartImpl extends SOAPPart
          else if (node instanceof Element)
             domElement = (Element)node;
          else
-            throw new SOAPException("Unsupported DOMSource node: " + node);
+            throw NativeMessages.MESSAGES.unsupportedDOMSourceNode(node);
 
          EnvelopeBuilder envBuilder = (EnvelopeBuilder) ServiceLoader.loadService(EnvelopeBuilder.class.getName(), EnvelopeBuilderDOM.class.getName());
          envBuilder.setStyle(Style.DOCUMENT);
@@ -189,12 +191,12 @@ public class SOAPPartImpl extends SOAPPart
          }
          catch (IOException e)
          {
-            throw new SOAPException("Cannot parse stream source", e);
+            throw new SOAPException(e);
          }
       }
       else
       {
-         throw new SOAPException("Unsupported source parameter: " + source);
+         throw NativeMessages.MESSAGES.unsupportedSourceParameter(source);
       }
    }
 
@@ -574,12 +576,12 @@ public class SOAPPartImpl extends SOAPPart
 
    public void setParentElement(SOAPElement parent) throws SOAPException
    {
-      throw new SOAPException("The parent element of a soap part is not defined");
+      throw NativeMessages.MESSAGES.parentElemOfSOAPPartIsNotDefined();
    }
 
    public void setValue(String value)
    {
-      throw new IllegalStateException("Setting value of a soap part is not defined");
+      throw NativeMessages.MESSAGES.settingValueOfSOAPPartIsNotDefined();
    }
 
 }

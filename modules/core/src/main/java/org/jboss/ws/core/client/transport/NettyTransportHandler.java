@@ -28,20 +28,18 @@ import java.net.URL;
 import java.security.AccessController;
 import java.util.Map;
 import java.util.StringTokenizer;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 
-import org.jboss.logging.Logger;
 import org.jboss.netty.bootstrap.ClientBootstrap;
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelFactory;
 import org.jboss.netty.channel.ChannelFuture;
 import org.jboss.netty.channel.ChannelPipelineFactory;
-import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
 import org.jboss.netty.handler.codec.http.HttpHeaders;
 import org.jboss.netty.handler.codec.http.HttpVersion;
-import org.jboss.ws.Constants;
-import org.jboss.wsf.spi.util.ServiceLoader;
+import org.jboss.ws.NativeLoggers;
+import org.jboss.ws.NativeMessages;
+import org.jboss.ws.api.util.ServiceLoader;
+import org.jboss.ws.common.Constants;
 
 /**
  * This handles the Netty channels, allowing for a
@@ -53,7 +51,6 @@ import org.jboss.wsf.spi.util.ServiceLoader;
  */
 public class NettyTransportHandler
 {
-   private static Logger log = Logger.getLogger(NettyTransportHandler.class);
    private static final int DEFAULT_KEEP_ALIVE_CONS = 5;
    
    private URL url;
@@ -90,7 +87,7 @@ public class NettyTransportHandler
          keepAliveProp = true;
       }
       factoryProvider = (ClientSocketChannelFactoryProvider)ServiceLoader.loadService(ClientSocketChannelFactoryProvider.class.getName(),
-            DefaultClientSocketChannelFactoryProvider.class.getName());
+            DefaultClientSocketChannelFactoryProvider.class.getName(), NettyTransportHandler.class.getClassLoader());
    }
 
    private NettyTransportHandler(URL url, ChannelPipelineFactory pipelineFactory)
@@ -165,7 +162,7 @@ public class NettyTransportHandler
          NettyHelper.awaitUninterruptibly(connectFuture, timeout);
          if (!connectFuture.isSuccess())
          {
-            ConnectException ce = new ConnectException("Could not connect to " + url.getHost());
+            ConnectException ce = NativeMessages.MESSAGES.couldNotConnectTo(url.getHost());
             ce.initCause(connectFuture.getCause());
             throw ce;
          }
@@ -259,7 +256,7 @@ public class NettyTransportHandler
       }
       catch (Exception ex)
       {
-         log.error("Error while parsing headers for configuring keep-alive, closing connection. ", ex);
+         NativeLoggers.CLIENT_LOGGER.errorParsingHeadersForConfiguringKeepAlive(ex);
          keepAliveConnections = -1;
          keepingAlive = false;
       }

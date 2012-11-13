@@ -21,6 +21,13 @@
  */
 package org.jboss.ws.core.jaxrpc.client;
 
+import static org.jboss.ws.NativeMessages.MESSAGES;
+
+import java.io.Externalizable;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
+import java.io.Serializable;
 import java.lang.reflect.Proxy;
 import java.net.URL;
 import java.rmi.Remote;
@@ -40,7 +47,8 @@ import javax.xml.rpc.handler.HandlerChain;
 import javax.xml.rpc.handler.HandlerInfo;
 import javax.xml.rpc.handler.HandlerRegistry;
 
-import org.jboss.logging.Logger;
+import org.jboss.ws.NativeLoggers;
+import org.jboss.ws.common.ResourceLoaderAdapter;
 import org.jboss.ws.core.StubExt;
 import org.jboss.ws.metadata.builder.jaxrpc.JAXRPCClientMetaDataBuilder;
 import org.jboss.ws.metadata.jaxrpcmapping.JavaWsdlMapping;
@@ -50,14 +58,12 @@ import org.jboss.ws.metadata.umdm.HandlerMetaDataJAXRPC;
 import org.jboss.ws.metadata.umdm.OperationMetaData;
 import org.jboss.ws.metadata.umdm.ServiceMetaData;
 import org.jboss.ws.metadata.umdm.UnifiedMetaData;
-import org.jboss.ws.metadata.wsse.WSSecurityConfiguration;
-import org.jboss.wsf.common.ResourceLoaderAdapter;
 import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedCallPropertyMetaData;
+import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedHandlerMetaData.HandlerType;
 import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedInitParamMetaData;
 import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedPortComponentRefMetaData;
 import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedServiceRefMetaData;
 import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedStubPropertyMetaData;
-import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedHandlerMetaData.HandlerType;
 
 /**
  * Service class acts as a factory for:
@@ -71,58 +77,92 @@ import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedHandlerMetaData.Handler
  * @author Thomas.Diesler@jboss.org
  * @since 10-Oct-2004
  */
-public class ServiceImpl implements ServiceExt
+public class ServiceImpl implements ServiceExt, Serializable, Externalizable
 {
-   // provide logging
-   private static final Logger log = Logger.getLogger(ServiceImpl.class);
-
    // The service meta data that is associated with this JAXRPC Service
-   private ServiceMetaData serviceMetaData;
+   private transient ServiceMetaData serviceMetaData;
+   private QName serviceName;
    // The optional WSDL location
    private URL wsdlLocation;
+   private URL mappingURL;
+   private JavaWsdlMapping mappingConfig;
    // The <service-ref> meta data
    private UnifiedServiceRefMetaData usrMetaData;
 
    // The handler registry
-   private HandlerRegistryImpl handlerRegistry;
+   private transient HandlerRegistryImpl handlerRegistry;
+
+   public ServiceImpl() {
+       // for deserialization only
+   }
 
    /**
     * Construct a Service without WSDL meta data
     */
-   ServiceImpl(QName serviceName)
+   public ServiceImpl(QName serviceName)
    {
-      UnifiedMetaData wsMetaData = new UnifiedMetaData(new ResourceLoaderAdapter());
-      serviceMetaData = new ServiceMetaData(wsMetaData, serviceName);
-      handlerRegistry = new HandlerRegistryImpl(serviceMetaData);
+      this.serviceName = serviceName;
+      init();
    }
 
    /**
     * Construct a Service that has access to some WSDL meta data
     */
-   ServiceImpl(QName serviceName, URL wsdlURL, URL mappingURL, URL securityURL)
+   public ServiceImpl(QName serviceName, URL wsdlURL, URL mappingURL, URL securityURL)
    {
+      this.serviceName = serviceName;
       this.wsdlLocation = wsdlURL;
-      JAXRPCClientMetaDataBuilder builder = new JAXRPCClientMetaDataBuilder();
-
-      ClassLoader ctxClassLoader = SecurityActions.getContextClassLoader();
-
-      serviceMetaData = builder.buildMetaData(serviceName, wsdlURL, mappingURL, securityURL, null, ctxClassLoader);
-      handlerRegistry = new HandlerRegistryImpl(serviceMetaData);
+      this.mappingURL = mappingURL;
+      init();
    }
 
    /**
     * Construct a Service that has access to some WSDL meta data
     */
-   ServiceImpl(QName serviceName, URL wsdlURL, JavaWsdlMapping mappingURL, WSSecurityConfiguration securityConfig, UnifiedServiceRefMetaData usrMetaData)
+   public ServiceImpl(QName serviceName, URL wsdlURL, JavaWsdlMapping mappingURL, UnifiedServiceRefMetaData usrMetaData)
    {
+      this.serviceName = serviceName;
       this.wsdlLocation = wsdlURL;
+      this.mappingConfig = mappingURL;
       this.usrMetaData = usrMetaData;
+      init();
+   }
 
-      JAXRPCClientMetaDataBuilder builder = new JAXRPCClientMetaDataBuilder();
-      ClassLoader ctxClassLoader = SecurityActions.getContextClassLoader();
+   public void writeExternal(final ObjectOutput out) throws IOException {
+       out.writeObject(serviceName);
+       out.writeObject(wsdlLocation);
+       out.writeObject(mappingURL);
+       out.writeObject(mappingConfig);
+       out.writeObject(usrMetaData);
+   }
 
-      serviceMetaData = builder.buildMetaData(serviceName, wsdlURL, mappingURL, securityConfig, usrMetaData, ctxClassLoader);
-      handlerRegistry = new HandlerRegistryImpl(serviceMetaData);
+   public void readExternal(final ObjectInput in) throws IOException, ClassNotFoundException {
+       serviceName = (QName)in.readObject();
+       wsdlLocation = (URL)in.readObject();
+       mappingURL = (URL)in.readObject();
+       mappingConfig = (JavaWsdlMapping)in.readObject();
+       usrMetaData = (UnifiedServiceRefMetaData)in.readObject();
+       init();
+   }
+
+   private void init() {
+       if ((wsdlLocation == null) && (mappingURL == null) && (mappingConfig == null) && (usrMetaData == null)) {
+           UnifiedMetaData wsMetaData = new UnifiedMetaData(new ResourceLoaderAdapter());
+           serviceMetaData = new ServiceMetaData(wsMetaData, serviceName);
+           handlerRegistry = new HandlerRegistryImpl(serviceMetaData);
+           return;
+       }
+       if (mappingURL != null) {
+           JAXRPCClientMetaDataBuilder builder = new JAXRPCClientMetaDataBuilder();
+           ClassLoader ctxClassLoader = SecurityActions.getContextClassLoader();
+           serviceMetaData = builder.buildMetaData(serviceName, wsdlLocation, mappingURL, null, ctxClassLoader);
+           handlerRegistry = new HandlerRegistryImpl(serviceMetaData);
+           return;
+       }
+       JAXRPCClientMetaDataBuilder builder = new JAXRPCClientMetaDataBuilder();
+       ClassLoader ctxClassLoader = SecurityActions.getContextClassLoader();
+       serviceMetaData = builder.buildMetaData(serviceName, wsdlLocation, mappingConfig, usrMetaData, ctxClassLoader);
+       handlerRegistry = new HandlerRegistryImpl(serviceMetaData);
    }
 
    public ServiceMetaData getServiceMetaData()
@@ -247,7 +287,7 @@ public class ServiceImpl implements ServiceExt
    {
       EndpointMetaData epMetaData = serviceMetaData.getEndpoint(portName);
       if (epMetaData == null)
-         throw new ServiceException("Cannot find endpoint for name: " + portName);
+         throw MESSAGES.cannotFindEndpointForName(portName);
 
       List<Call> calls = new ArrayList<Call>();
       for (OperationMetaData opMetaData : epMetaData.getOperations())
@@ -270,7 +310,7 @@ public class ServiceImpl implements ServiceExt
     */
    public HandlerRegistry getHandlerRegistry()
    {
-      throw new UnsupportedOperationException("Components should not use the getHandlerRegistry() method.");
+      throw MESSAGES.shouldNotUseMethod("getHandlerRegistry()");
    }
 
    /**
@@ -289,7 +329,7 @@ public class ServiceImpl implements ServiceExt
     */
    public TypeMappingRegistry getTypeMappingRegistry()
    {
-      throw new UnsupportedOperationException("Components should not use the getTypeMappingRegistry() method.");
+      throw MESSAGES.shouldNotUseMethod("getTypeMappingRegistry()");
    }
 
    /**
@@ -327,14 +367,14 @@ public class ServiceImpl implements ServiceExt
    public Remote getPort(Class seiClass) throws ServiceException
    {
       if (seiClass == null)
-         throw new IllegalArgumentException("SEI class cannot be null");
+         throw MESSAGES.illegalNullArgument("seiClass");
 
       String seiName = seiClass.getName();
       if (Remote.class.isAssignableFrom(seiClass) == false)
-         throw new ServiceException("SEI does not implement java.rmi.Remote: " + seiName);
+         throw new ServiceException(MESSAGES.notImplementRemote(seiName));
 
       if (serviceMetaData == null)
-         throw new ServiceException("Service meta data not available");
+         throw MESSAGES.serviceMetaDataNotAvailable();
 
       try
       {
@@ -346,7 +386,7 @@ public class ServiceImpl implements ServiceExt
          }
 
          if (epMetaData == null)
-            throw new ServiceException("Cannot find endpoint meta data for: " + seiName);
+            throw MESSAGES.cannotFindEndpointMetaData(seiName);
 
          return createProxy(seiClass, epMetaData);
       }
@@ -356,7 +396,7 @@ public class ServiceImpl implements ServiceExt
       }
       catch (Exception ex)
       {
-         throw new ServiceException("Cannot create proxy", ex);
+         throw new ServiceException(ex);
       }
    }
 
@@ -370,18 +410,18 @@ public class ServiceImpl implements ServiceExt
    public Remote getPort(QName portName, Class seiClass) throws ServiceException
    {
       if (seiClass == null)
-         throw new IllegalArgumentException("SEI class cannot be null");
+         throw MESSAGES.illegalNullArgument("seiClass");
 
       if (serviceMetaData == null)
-         throw new ServiceException("Service meta data not available");
+         throw MESSAGES.serviceMetaDataNotAvailable();
 
       String seiName = seiClass.getName();
       if (Remote.class.isAssignableFrom(seiClass) == false)
-         throw new ServiceException("SEI does not implement java.rmi.Remote: " + seiName);
+         throw new ServiceException(MESSAGES.notImplementRemote(seiName));
 
       EndpointMetaData epMetaData = serviceMetaData.getEndpoint(portName);
       if (epMetaData == null)
-         throw new ServiceException("Cannot obtain endpoint meta data for: " + portName);
+         throw MESSAGES.cannotFindEndpointMetaData(portName);
 
       try
       {
@@ -396,7 +436,7 @@ public class ServiceImpl implements ServiceExt
       }
       catch (Exception ex)
       {
-         throw new ServiceException("Cannot create proxy", ex);
+         throw new ServiceException(ex);
       }
    }
 
@@ -407,7 +447,7 @@ public class ServiceImpl implements ServiceExt
 
       // JBoss-4.0.x does not support <stub-properties>
       if (initCallProperties(call, seiClass.getName()) > 0)
-         log.info("Deprecated use of <call-properties> on JAXRPC Stub. Use <stub-properties>");
+         NativeLoggers.JAXRPC_LOGGER.deprecatedUseOfCallPropsOnJAXRPCStub();
 
       PortProxy handler = new PortProxy(call);
       ClassLoader cl = epMetaData.getClassLoader();
@@ -491,7 +531,7 @@ public class ServiceImpl implements ServiceExt
       handlerRegistry.registerClientHandlerChain(portName, infos, roles);
    }
 
-   void setupHandlerChain(EndpointMetaData epMetaData)
+   public void setupHandlerChain(EndpointMetaData epMetaData)
    {
       if (epMetaData.isHandlersInitialized() == false)
       {
@@ -517,7 +557,7 @@ public class ServiceImpl implements ServiceExt
             hConfig.put(HandlerType.class.getName(), jaxrpcMetaData.getHandlerType());
             HandlerInfo info = new HandlerInfo(hClass, hConfig, headerArr);
 
-            log.debug("Adding client side handler to endpoint '" + portName + "': " + info);
+            NativeLoggers.JAXRPC_LOGGER.addingClientSideHandlerToEndpoint(portName, info);
             handlerInfos.add(info);
          }
 

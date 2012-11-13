@@ -21,37 +21,28 @@
  */
 package org.jboss.ws.core.soap;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.lang.reflect.Array;
 import java.lang.reflect.Method;
-import java.util.List;
 
-import javax.activation.DataHandler;
-import javax.activation.DataSource;
 import javax.xml.namespace.QName;
 import javax.xml.soap.SOAPElement;
 import javax.xml.soap.SOAPException;
-import javax.xml.transform.Source;
 
 import org.jboss.logging.Logger;
-import org.jboss.ws.Constants;
+import org.jboss.ws.NativeMessages;
 import org.jboss.ws.WSException;
+import org.jboss.ws.common.DOMUtils;
+import org.jboss.ws.common.JavaUtils;
 import org.jboss.ws.core.CommonMessageContext;
 import org.jboss.ws.core.binding.AbstractDeserializerFactory;
 import org.jboss.ws.core.binding.BindingException;
 import org.jboss.ws.core.binding.DeserializerSupport;
 import org.jboss.ws.core.binding.SerializationContext;
 import org.jboss.ws.core.binding.TypeMappingImpl;
-import org.jboss.ws.core.jaxws.SerializationContextJAXWS;
-import org.jboss.ws.core.soap.attachment.SwapableMemoryDataSource;
-import org.jboss.ws.core.utils.MimeUtils;
-import org.jboss.ws.extensions.xop.XOPContext;
+import org.jboss.ws.core.soap.utils.MessageContextAssociation;
+import org.jboss.ws.core.soap.utils.XMLFragment;
 import org.jboss.ws.metadata.umdm.OperationMetaData;
 import org.jboss.ws.metadata.umdm.ParameterMetaData;
-import org.jboss.wsf.common.DOMUtils;
-import org.jboss.wsf.common.JavaUtils;
 import org.w3c.dom.Comment;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -106,26 +97,16 @@ class XMLContent extends SOAPContent
          }
          catch (SOAPException ex)
          {
-            throw new WSException("Cannot expand container children", ex);
+            throw new WSException(ex);
          }
          next = new DOMContent(container);
       }
       else
       {
-         throw new IllegalArgumentException("Illegal state requested: " + nextState);
+         throw new IllegalArgumentException("Illegal state requested " + nextState);
       }
 
       return next;
-   }
-
-   public Source getPayload()
-   {
-      return xmlFragment.getSource();
-   }
-
-   public void setPayload(Source source)
-   {
-      xmlFragment = new XMLFragment(source);
    }
 
    public XMLFragment getXMLFragment()
@@ -140,12 +121,12 @@ class XMLContent extends SOAPContent
 
    public Object getObjectValue()
    {
-      throw new IllegalStateException("Object value not available");
+      throw NativeMessages.MESSAGES.objectValueNotAvailable();
    }
 
    public void setObjectValue(Object objValue)
    {
-      throw new IllegalStateException("Object value not available");
+      throw NativeMessages.MESSAGES.objectValueNotAvailable();
    }
 
    private Object unmarshallObjectContents()
@@ -160,16 +141,13 @@ class XMLContent extends SOAPContent
          log.debug("getObjectValue [xmlType=" + xmlType + ",javaType=" + javaType + "]");
 
       CommonMessageContext msgContext = MessageContextAssociation.peekMessageContext();
-      if (msgContext == null)
-         throw new WSException("MessageContext not available");
+      assert(msgContext != null);
 
       SerializationContext serContext = msgContext.getSerializationContext();
       ParameterMetaData pmd = container.getParamMetaData();
       OperationMetaData opMetaData = pmd.getOperationMetaData();
       serContext.setProperty(ParameterMetaData.class.getName(), pmd);
       serContext.setJavaType(javaType);
-      List<Class> registeredTypes = opMetaData.getEndpointMetaData().getRegisteredTypes();
-      serContext.setProperty(SerializationContextJAXWS.JAXB_CONTEXT_TYPES, registeredTypes.toArray(new Class[0]));
 
       try
       {
@@ -216,33 +194,9 @@ class XMLContent extends SOAPContent
 
             if (!isAssignable)
             {
-               // handle XOP simple types, i.e. in RPC/LIT
-               try
-               {
-                  String contentType = MimeUtils.resolveMimeType(javaType);
-                  if (debugEnabled)
-                     log.debug("Adopt DataHandler to " + javaType + ", contentType " + contentType);
-
-                  DataSource ds = new SwapableMemoryDataSource(((DataHandler)obj).getInputStream(), contentType);
-                  DataHandler dh = new DataHandler(ds);
-                  obj = dh.getContent();
-
-                  // 'application/octet-stream' will return a byte[] instead fo the stream
-                  if (obj instanceof InputStream)
-                  {
-                     ByteArrayOutputStream bout = new ByteArrayOutputStream();
-                     dh.writeTo(bout);
-                     obj = bout.toByteArray();
-                  }
-               }
-               catch (IOException e)
-               {
-                  throw new WSException("Failed to adopt XOP content type", e);
-               }
-
                if (!JavaUtils.isAssignableFrom(javaType, obj.getClass()))
                {
-                  throw new WSException("Java type '" + javaType + "' is not assignable from: " + objType.getName());
+                  throw NativeMessages.MESSAGES.javaTypeIsNotAssignableFrom2(javaType.toString(),  objType.getName());
                }
             }
          }
@@ -285,9 +239,6 @@ class XMLContent extends SOAPContent
          }
       }
 
-      if (deserializerFactory == null)
-         throw new WSException("Cannot obtain deserializer factory for: [xmlType=" + xmlType + ",javaType=" + javaType + "]");
-
       return deserializerFactory;
    }
 
@@ -308,7 +259,7 @@ class XMLContent extends SOAPContent
       boolean artificalElement = (SOAPContentElement.GENERIC_PARAM_NAME.equals(qname) || SOAPContentElement.GENERIC_RETURN_NAME.equals(qname));
 
       if (!artificalElement && !contentRootName.equals(qname))
-         throw new WSException("Content root name does not match element name: " + contentRootName + " != " + qname);
+         throw NativeMessages.MESSAGES.doesNotMatchElementName(contentRootName, qname);
 
       // Remove all child nodes
       container.removeContents();
@@ -353,9 +304,6 @@ class XMLContent extends SOAPContent
                }
                SOAPElement soapElement = soapFactory.createElement((Element)child);
                container.addChildElement(soapElement);
-               if (Constants.NAME_XOP_INCLUDE.equals(qname) || container.isXOPParameter())
-                  XOPContext.inlineXOPData(soapElement);
-
             }
             finally
             {

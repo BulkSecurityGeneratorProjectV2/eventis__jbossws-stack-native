@@ -21,6 +21,9 @@
  */
 package org.jboss.ws.metadata.builder;
 
+import static org.jboss.ws.NativeMessages.MESSAGES;
+import static org.jboss.ws.common.integration.WSHelper.isJseEndpoint;
+
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URI;
@@ -38,18 +41,14 @@ import javax.wsdl.extensions.http.HTTPAddress;
 import javax.wsdl.extensions.soap.SOAPAddress;
 import javax.wsdl.extensions.soap12.SOAP12Address;
 import javax.xml.namespace.QName;
-import javax.xml.ws.addressing.AddressingProperties;
 
 import org.jboss.logging.Logger;
-import org.jboss.ws.Constants;
+import org.jboss.ws.NativeLoggers;
 import org.jboss.ws.WSException;
+import org.jboss.ws.common.Constants;
+import org.jboss.ws.common.ObjectNameFactory;
 import org.jboss.ws.core.jaxrpc.UnqualifiedFaultException;
-import org.jboss.ws.core.soap.Use;
-import org.jboss.ws.extensions.addressing.AddressingPropertiesImpl;
-import org.jboss.ws.extensions.addressing.metadata.AddressingOpMetaExt;
-import org.jboss.ws.extensions.eventing.EventingConstants;
-import org.jboss.ws.extensions.eventing.EventingUtils;
-import org.jboss.ws.extensions.eventing.metadata.EventingEpMetaExt;
+import org.jboss.ws.core.soap.utils.Use;
 import org.jboss.ws.metadata.umdm.EndpointMetaData;
 import org.jboss.ws.metadata.umdm.FaultMetaData;
 import org.jboss.ws.metadata.umdm.OperationMetaData;
@@ -64,22 +63,15 @@ import org.jboss.ws.metadata.wsdl.WSDLInterface;
 import org.jboss.ws.metadata.wsdl.WSDLInterfaceFault;
 import org.jboss.ws.metadata.wsdl.WSDLInterfaceOperation;
 import org.jboss.ws.metadata.wsdl.WSDLInterfaceOperationOutfault;
-import org.jboss.ws.metadata.wsdl.WSDLInterfaceOperationOutput;
-import org.jboss.ws.metadata.wsdl.WSDLProperty;
 import org.jboss.ws.metadata.wsdl.WSDLService;
-import org.jboss.ws.metadata.wsdl.WSDLUtils;
-import org.jboss.ws.metadata.wsdl.xmlschema.JBossXSModel;
-import org.jboss.wsf.common.ObjectNameFactory;
 import org.jboss.wsf.spi.SPIProvider;
 import org.jboss.wsf.spi.SPIProviderResolver;
 import org.jboss.wsf.spi.deployment.ArchiveDeployment;
 import org.jboss.wsf.spi.deployment.Deployment;
 import org.jboss.wsf.spi.deployment.Endpoint;
+import org.jboss.wsf.spi.deployment.HttpEndpoint;
 import org.jboss.wsf.spi.management.ServerConfig;
 import org.jboss.wsf.spi.management.ServerConfigFactory;
-import org.jboss.wsf.spi.metadata.j2ee.EJBArchiveMetaData;
-import org.jboss.wsf.spi.metadata.j2ee.EJBMetaData;
-import org.jboss.wsf.spi.metadata.j2ee.MDBMetaData;
 import org.jboss.wsf.spi.metadata.j2ee.JSEArchiveMetaData;
 import org.jboss.wsf.spi.metadata.j2ee.JSESecurityMetaData;
 import org.jboss.wsf.spi.metadata.j2ee.JSESecurityMetaData.JSEResourceCollection;
@@ -126,7 +118,7 @@ public abstract class MetaDataBuilder
                QName bindQName = wsdlEndpoint.getBinding();
                WSDLBinding wsdlBinding = wsdlDefinitions.getBinding(bindQName);
                if (wsdlBinding == null)
-                  throw new WSException("Cannot obtain binding: " + bindQName);
+                  throw MESSAGES.cannotObtainBinding(bindQName);
 
                for (WSDLBindingOperation wsdlBindingOperation : wsdlBinding.getOperations())
                {
@@ -149,7 +141,7 @@ public abstract class MetaDataBuilder
       {
          Endpoint endpoint = dep.getService().getEndpointByName(linkName);
          if (endpoint != null)
-            urlPattern = endpoint.getURLPattern();
+            urlPattern = ((HttpEndpoint)endpoint).getURLPattern();
       }
 
       // Endpoint API hack
@@ -202,26 +194,6 @@ public abstract class MetaDataBuilder
       idstr.append(ServerEndpointMetaData.SEPID_PROPERTY_CONTEXT + "=" + context);
       idstr.append("," + ServerEndpointMetaData.SEPID_PROPERTY_ENDPOINT + "=" + linkName);
 
-      // Add JMS destination JNDI name for MDB endpoints
-      EJBArchiveMetaData apMetaData = dep.getAttachment(EJBArchiveMetaData.class);
-      if (apMetaData != null)
-      {
-         String ejbName = sepMetaData.getLinkName();
-         if (ejbName == null)
-            throw new WSException("Cannot obtain ejb-link from port component");
-
-         EJBMetaData beanMetaData = (EJBMetaData)apMetaData.getBeanByEjbName(ejbName);
-         if (beanMetaData == null)
-            throw new WSException("Cannot obtain ejb meta data for: " + ejbName);
-
-         if (beanMetaData instanceof MDBMetaData)
-         {
-            MDBMetaData mdMetaData = (MDBMetaData)beanMetaData;
-            String jndiName = mdMetaData.getDestinationJndiName();
-            idstr.append(",jms=" + jndiName);
-         }
-      }
-
       return ObjectNameFactory.create(idstr.toString());
    }
 
@@ -230,7 +202,7 @@ public abstract class MetaDataBuilder
    public static String getServiceEndpointAddress(String uriScheme, String servicePath, int servicePort, ServerConfig config)
    {
       if (servicePath == null || servicePath.length() == 0)
-         throw new WSException("Service path cannot be null");
+         throw MESSAGES.servicePathCannotBeNull();
 
       if (servicePath.endsWith("/*"))
          servicePath = servicePath.substring(0, servicePath.length() - 2);
@@ -280,7 +252,7 @@ public abstract class MetaDataBuilder
       }
       catch (MalformedURLException e)
       {
-         throw new WSException("Malformed URL: uriScheme={" + uriScheme + "} host={" + host + "} port={" + port + "} servicePath={" + servicePath + "}", e);
+         throw new WSException(e);
       }
    }
 
@@ -291,13 +263,13 @@ public abstract class MetaDataBuilder
    {
       String transportGuarantee = null;
       JSEArchiveMetaData webMetaData = dep.getAttachment(JSEArchiveMetaData.class);
-      if (webMetaData != null)
+      if (webMetaData != null && isJseEndpoint(sepMetaData.getEndpoint()))
       {
          Map<String, String> servletMappings = webMetaData.getServletMappings();
          String urlPattern = servletMappings.get(servletLink);
 
          if (urlPattern == null)
-            throw new WSException("Cannot find <url-pattern> for servlet-name: " + servletLink);
+            throw MESSAGES.cannotFindURLPatternForServletName(servletLink);
 
          List<JSESecurityMetaData> securityList = webMetaData.getSecurityMetaData();
          for (JSESecurityMetaData currentSecurity : securityList)
@@ -369,7 +341,7 @@ public abstract class MetaDataBuilder
                   }
                   catch (MalformedURLException e)
                   {
-                     log.warn("Malformed URL: " + orgAddress);
+                     NativeLoggers.ROOT_LOGGER.malformedURL(orgAddress);
                      sepMetaData.setEndpointAddress(orgAddress);
                   }
                }
@@ -378,7 +350,7 @@ public abstract class MetaDataBuilder
       }
 
       if (endpointFound == false)
-         throw new WSException("Cannot find port in wsdl: " + portName);
+         throw MESSAGES.cannotFindPortInWsdl(portName);
    }
    
    private static boolean requiresRewrite(String orgAddress, String uriScheme, ServerConfig config)
@@ -416,11 +388,11 @@ public abstract class MetaDataBuilder
       if (!wsdlOneOneDefinition.getImports().isEmpty())
       {
 
-         Iterator imports = wsdlOneOneDefinition.getImports().values().iterator();
+         Iterator<?> imports = wsdlOneOneDefinition.getImports().values().iterator();
          while (imports.hasNext())
          {
-            List l = (List)imports.next();
-            Iterator importsByNS = l.iterator();
+            List<?> l = (List<?>)imports.next();
+            Iterator<?> importsByNS = l.iterator();
             while (importsByNS.hasNext())
             {
                Import anImport = (Import)importsByNS.next();
@@ -432,7 +404,7 @@ public abstract class MetaDataBuilder
          }
       }
       
-      throw new IllegalArgumentException("Cannot find port with name '" + portQName + "' in wsdl document");
+      throw MESSAGES.cannotFindPortInWsdl2(portQName);
    }
 
    /**
@@ -498,196 +470,6 @@ public abstract class MetaDataBuilder
       }
    }
 
-   protected void processEndpointMetaDataExtensions(EndpointMetaData epMetaData, WSDLDefinitions wsdlDefinitions)
-   {
-      for (WSDLInterface wsdlInterface : wsdlDefinitions.getInterfaces())
-      {
-         WSDLProperty eventSourceProp = wsdlInterface.getProperty(Constants.WSDL_PROPERTY_EVENTSOURCE);
-         if (eventSourceProp != null && epMetaData instanceof ServerEndpointMetaData)
-         {
-            ServerEndpointMetaData sepMetaData = (ServerEndpointMetaData)epMetaData;
-            String eventSourceNS = wsdlInterface.getName().getNamespaceURI() + "/" + wsdlInterface.getName().getLocalPart();
-
-            // extract the schema model
-            JBossXSModel schemaModel = WSDLUtils.getSchemaModel(wsdlDefinitions.getWsdlTypes());
-            String[] notificationSchema = EventingUtils.extractNotificationSchema(schemaModel);
-
-            // extract the root element NS
-            String notificationRootElementNS = null;
-            WSDLInterfaceOperation wsdlInterfaceOperation = wsdlInterface.getOperations()[0];
-            if (wsdlInterfaceOperation.getOutputs().length > 0)
-            {
-               WSDLInterfaceOperationOutput wsdlInterfaceOperationOutput = wsdlInterfaceOperation.getOutputs()[0];
-               notificationRootElementNS = wsdlInterfaceOperationOutput.getElement().getNamespaceURI();
-            }
-            else
-            {
-               // WSDL operation of an WSDL interface that is marked as an event source
-               // requires to carry an output message.
-               throw new WSException("Unable to resolve eventing root element NS. No operation output found at " + wsdlInterfaceOperation.getName());
-            }
-
-            EventingEpMetaExt ext = new EventingEpMetaExt(EventingConstants.NS_EVENTING);
-            ext.setEventSourceNS(eventSourceNS);
-            ext.setNotificationSchema(notificationSchema);
-            ext.setNotificationRootElementNS(notificationRootElementNS);
-            sepMetaData.addExtension(ext);
-         }
-      }
-   }
-
-   /** Process operation meta data extensions. */
-   protected void processOpMetaExtensions(OperationMetaData opMetaData, WSDLInterfaceOperation wsdlOperation)
-   {
-      final AddressingProperties ADDR = new AddressingPropertiesImpl();
-      final AddressingOpMetaExt addrExt = new AddressingOpMetaExt(ADDR.getNamespaceURI());
-      final boolean isOneWay = Constants.WSDL20_PATTERN_IN_ONLY.equals(wsdlOperation.getPattern());
-
-      final String inputAction = this.getInputAction(wsdlOperation, isOneWay);
-      addrExt.setInboundAction(inputAction);
-      
-      if (!isOneWay)
-      {
-         final String outputAction = this.getOutputAction(wsdlOperation, isOneWay);
-         addrExt.setOutboundAction(outputAction);
-         
-         setFaultActions(opMetaData, wsdlOperation, addrExt);
-      }
-
-      opMetaData.addExtension(addrExt);
-   }
-   
-   private void setFaultActions(final OperationMetaData opMetaData, final WSDLInterfaceOperation wsdlOperation, final AddressingOpMetaExt addrExt)
-   {
-      for (WSDLInterfaceOperationOutfault fault : wsdlOperation.getOutfaults())
-      {
-         final QName faultQName = wsdlOperation.getWsdlInterface().getFault(fault.getRef()).getElement();
-         final String action = this.getFaultAction(wsdlOperation, fault);
-         
-         addrExt.setFaultAction(faultQName, action);
-      }
-   }
-   
-   /* 
-   Copy/paste from http://www.w3.org/TR/wsdl#_names
-
-   2.4.5 Names of Elements within an Operation
-
-   The name attribute of the input and output elements provides a unique name among all
-   input and output elements within the enclosing port type.
-
-   In order to avoid having to name each input and output element within an operation,
-   WSDL provides some default values based on the operation name. If the name attribute
-   is not specified on a one-way or notification message, it defaults to the name of the operation.
-   If the name attribute is not specified on the input or output messages of a
-   request-response or solicit-response operation, the name defaults to the name of
-   the operation with "Request"/"Solicit" or "Response" appended, respectively.
-
-   Each fault element must be named to allow a binding to specify the concrete format of the fault message.
-   The name of the fault element is unique within the set of faults defined for the operation.
-   */
-
-   private String getInputAction(final WSDLInterfaceOperation wsdlOperation, final boolean oneWay)
-   {
-      WSDLProperty wsaInAction = wsdlOperation.getProperty(Constants.WSDL_PROPERTY_ACTION_IN);
-      if (wsaInAction != null && wsaInAction.getValue() != null && !"".equals(wsaInAction.getValue()))
-      {
-         return wsaInAction.getValue();
-      }
-
-      final String prefix = this.getActionPrefix(wsdlOperation);
-      String operationName = wsdlOperation.getName().getLocalPart();
-
-      WSDLProperty inputName = wsdlOperation.getProperty(Constants.WSDL_PROPERTY_MESSAGE_NAME_IN);
-      if (inputName != null && inputName.getValue() != null && !"".equals(inputName.getValue()))
-      {
-         return prefix + inputName.getValue();
-      }
-      else
-      {
-         return prefix + operationName + (oneWay ? "" : "Request");
-      }
-   }
-   
-   private String getOutputAction(final WSDLInterfaceOperation wsdlOperation, final boolean oneWay)
-   {
-      WSDLProperty wsaOutAction = wsdlOperation.getProperty(Constants.WSDL_PROPERTY_ACTION_OUT);
-      if (wsaOutAction != null && wsaOutAction.getValue() != null && !"".equals(wsaOutAction.getValue()))
-      {
-         return wsaOutAction.getValue();
-      }
-
-      final String prefix = this.getActionPrefix(wsdlOperation);
-      String operationName = wsdlOperation.getName().getLocalPart();
-
-      WSDLProperty outputName = wsdlOperation.getProperty(Constants.WSDL_PROPERTY_MESSAGE_NAME_OUT);
-      if (outputName != null && outputName.getValue() != null && !"".equals(outputName.getValue()))
-      {
-         return prefix + outputName.getValue();
-      }
-      else
-      {
-         return prefix + operationName + (oneWay ? "" : "Response");
-      }
-   }
-   
-   /*
-    Copy/paste from http://www.w3.org/TR/2007/REC-ws-addr-metadata-20070904/#defactionwsdl11
-
-    4.4.4 Default Action Pattern for WSDL 1.1
-
-    A default pattern is also defined for backwards compatibility with WSDL 1.1. In the absence of an explicitly specified value
-    for the [action] property (see section 4.4.1 Explicit Association), the following pattern is used to construct a default action
-    for inputs and outputs. The general form of an action IRI is as follows:
-
-    Example 4-6. Structure of defaulted wsa:Action IRI.
-
-    [target namespace][delimiter][port type name][delimiter][input|output name]
-
-    For fault messages, the general form of an action IRI is as follows:
-
-    Example 4-7. Structure of default wsa:Action IRI for faults
-
-    [target namespace][delimiter][port type name][delimiter][operation name][delimiter]Fault[delimiter][fault name]
-    */
-   private String getFaultAction(final WSDLInterfaceOperation wsdlOperation, final WSDLInterfaceOperationOutfault fault)
-   {
-      final WSDLProperty wsaFaultAction = fault.getProperty(Constants.WSDL_PROPERTY_ACTION_FAULT);
-      if (wsaFaultAction != null && wsaFaultAction.getValue() != null && !"".equals(wsaFaultAction.getValue()))
-      {
-         return wsaFaultAction.getValue();
-      }
-
-      final String prefix = this.getActionPrefix(wsdlOperation);
-      String operationName = wsdlOperation.getName().getLocalPart();
-
-      final WSDLProperty faultName = fault.getProperty(Constants.WSDL_PROPERTY_MESSAGE_NAME_FAULT);
-      final String delimeter = this.getDelimeter(prefix);
-      if (faultName != null && faultName.getValue() != null && !"".equals(faultName.getValue()))
-      {
-         return prefix + operationName + delimeter + "Fault" + delimeter + faultName.getValue();
-      }
-      
-      throw new IllegalStateException();
-   }
-   
-   private String getActionPrefix(final WSDLInterfaceOperation wsdlOperation)
-   {
-      final String portTypeName = wsdlOperation.getWsdlInterface().getName().getLocalPart();
-      String namespace = wsdlOperation.getName().getNamespaceURI();
-      final String delimeter = this.getDelimeter(namespace);
-
-      if (!namespace.endsWith(delimeter))
-         namespace += delimeter;
-      
-      return namespace + portTypeName + delimeter;
-   }
-   
-   private String getDelimeter(final String namespace)
-   {
-      return namespace.toLowerCase().startsWith("urn:") ? ":" : "/";
-   }
-   
    protected void buildFaultMetaData(OperationMetaData opMetaData, WSDLInterfaceOperation wsdlOperation)
    {
       TypesMetaData typesMetaData = opMetaData.getEndpointMetaData().getServiceMetaData().getTypesMetaData();
@@ -704,7 +486,7 @@ public abstract class MetaDataBuilder
 
          if (xmlType == null)
          {
-            log.warn("Cannot obtain fault type for element: " + xmlName);
+            NativeLoggers.ROOT_LOGGER.cannotObtainFaultTypeForElement(xmlName);
             xmlType = xmlName;
          }
 
@@ -714,7 +496,7 @@ public abstract class MetaDataBuilder
 
          if (javaTypeName == null)
          {
-            log.warn("Cannot obtain java type mapping for: " + xmlType);
+            NativeLoggers.ROOT_LOGGER.cannotObtainJavaTypeMappingFor(xmlType);
             javaTypeName = new UnqualifiedFaultException(xmlType).getClass().getName();
          }
 

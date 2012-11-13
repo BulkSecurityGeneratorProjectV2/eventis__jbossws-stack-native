@@ -26,6 +26,7 @@ import javax.xml.rpc.Service;
 
 import junit.framework.Test;
 
+import org.jboss.wsf.test.CleanupOperation;
 import org.jboss.wsf.test.JBossWSTest;
 import org.jboss.wsf.test.JBossWSTestSetup;
 
@@ -40,21 +41,36 @@ import org.jboss.wsf.test.JBossWSTestSetup;
 public class JBWS1190TestCase extends JBossWSTest
 {
    private static final String ARCHIVE_NAME = "jaxrpc-jbws1190.war";
+   private static InitialContext iniCtx;
 
    private static TestEndpoint port;
 
    public static Test suite()
    {
-      return new JBossWSTestSetup(JBWS1190TestCase.class, ARCHIVE_NAME + ", jaxrpc-jbws1190-client.jar");
+      return new JBossWSTestSetup(JBWS1190TestCase.class, ARCHIVE_NAME + ", jaxrpc-jbws1190-appclient.ear#jaxrpc-jbws1190-appclient.jar", new CleanupOperation() {
+         @Override
+         public void cleanUp() {
+            port = null;
+         }
+      });
    }
 
    protected void setUp() throws Exception
    {
       if (port == null)
       {
-         InitialContext iniCtx = getInitialContext();
-         Service service = (Service)iniCtx.lookup("java:comp/env/service/TestService");
+         iniCtx = getAppclientInitialContext();
+         Service service = (Service)iniCtx.lookup("java:service/TestService");
          port = (TestEndpoint)service.getPort(TestEndpoint.class);
+      }
+   }
+
+   protected void tearDown() throws Exception
+   {
+      if (iniCtx != null)
+      {
+         iniCtx.close();
+         iniCtx = null;
       }
    }
 

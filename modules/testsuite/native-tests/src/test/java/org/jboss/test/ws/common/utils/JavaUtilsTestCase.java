@@ -21,9 +21,8 @@
  */
 package org.jboss.test.ws.common.utils;
 
-import org.jboss.test.ws.tools.jbws_161.custom.HelloObj;
 import org.jboss.wsf.test.JBossWSTest;
-import org.jboss.wsf.common.JavaUtils;
+import org.jboss.ws.common.JavaUtils;
 
 /**
  * Test the JavaUtils
@@ -33,14 +32,6 @@ import org.jboss.wsf.common.JavaUtils;
  */
 public class JavaUtilsTestCase extends JBossWSTest
 {
-   public void testLoadArrayType() throws Exception
-   {
-      String javaTypeName = HelloObj.class.getName();
-      Class javaType = JavaUtils.loadJavaType(javaTypeName + "[]");
-      assertNotNull("Unexpected null type", javaType);
-      assertEquals("[L" + javaTypeName + ";", javaType.getName());
-   }
-
    public void testGetMultipleArrayWrapperValue() throws Exception
    {
       int[][] primParams = new int[][] { { 0, 1, 2 }, { 1, 2, 3 }, { 2, 3, 4 } };

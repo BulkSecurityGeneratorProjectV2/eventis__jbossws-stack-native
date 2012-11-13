@@ -35,6 +35,7 @@ import org.jboss.netty.handler.codec.http.HttpChunkAggregator;
 import org.jboss.netty.handler.codec.http.HttpRequestEncoder;
 import org.jboss.netty.handler.codec.http.HttpResponseDecoder;
 import org.jboss.netty.handler.ssl.SslHandler;
+import org.jboss.ws.NativeMessages;
 import org.jboss.ws.core.WSTimeoutException;
 
 /**
@@ -89,7 +90,7 @@ public class NettyHelper
          boolean bool = future.awaitUninterruptibly(timeout);
          if (!bool)
          {
-            throw new WSTimeoutException("Timeout after: " + timeout + "ms", timeout);
+            throw NativeMessages.MESSAGES.timeout(timeout);
          }
       }
       else

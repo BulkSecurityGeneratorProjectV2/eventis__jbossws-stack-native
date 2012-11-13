@@ -21,23 +21,23 @@
  */
 package org.jboss.ws.core.jaxrpc.binding;
 
+import static org.jboss.ws.NativeMessages.MESSAGES;
+
 import javax.xml.namespace.QName;
 import javax.xml.transform.Result;
 
 import org.jboss.logging.Logger;
-import org.jboss.ws.Constants;
-import org.jboss.ws.WSException;
+import org.jboss.ws.common.Constants;
+import org.jboss.ws.common.JavaUtils;
+import org.jboss.ws.core.binding.AbstractSerializerFactory;
 import org.jboss.ws.core.binding.BindingException;
 import org.jboss.ws.core.binding.SerializationContext;
-import org.jboss.ws.core.binding.AbstractSerializerFactory;
 import org.jboss.ws.core.binding.SerializerSupport;
 import org.jboss.ws.core.binding.TypeMappingImpl;
-import org.jboss.ws.core.soap.NameImpl;
 import org.jboss.ws.core.soap.SOAPContentElement;
-import org.jboss.ws.core.soap.XMLFragment;
+import org.jboss.ws.core.soap.utils.XMLFragment;
 import org.jboss.ws.metadata.umdm.ParameterMetaData;
 import org.jboss.ws.util.xml.BufferedStreamResult;
-import org.jboss.wsf.common.JavaUtils;
 import org.w3c.dom.NamedNodeMap;
 
 /**
@@ -78,7 +78,7 @@ public class SOAPArraySerializer extends SerializerSupport
       try
       {
          if (paramMetaData == null)
-            throw new IllegalStateException("Use serialize(SOAPContenentElement, SerializationContext)");
+            throw new IllegalStateException();
 
          QName compXmlName = paramMetaData.getXmlName();
          QName compXmlType = paramMetaData.getSOAPArrayCompType();
@@ -100,18 +100,17 @@ public class SOAPArraySerializer extends SerializerSupport
          }
 
          if (compXmlType == null)
-            throw new WSException("Cannot obtain component xmlType for: " + compJavaType);
+            throw MESSAGES.cannotObtainComponentXmlType(compJavaType);
 
          // Get the component type serializer factory
          log.debug("Get component serializer for: [javaType=" + compJavaType.getName() + ",xmlType=" + compXmlType + "]");
          AbstractSerializerFactory compSerializerFactory = (AbstractSerializerFactory)typeMapping.getSerializer(compJavaType, compXmlType);
          if (compSerializerFactory == null)
          {
-            log.warn("Cannot obtain component serializer for: [javaType=" + compJavaType.getName() + ",xmlType=" + compXmlType + "]");
             compSerializerFactory = (AbstractSerializerFactory)typeMapping.getSerializer(null, compXmlType);
          }
          if (compSerializerFactory == null)
-            throw new WSException("Cannot obtain component serializer for: " + compXmlType);
+            throw MESSAGES.cannotObtainComponentSerializerFor(compXmlType);
 
          // Get the component type serializer
          compSerializer = (SerializerSupport)compSerializerFactory.getSerializer();
@@ -120,12 +119,12 @@ public class SOAPArraySerializer extends SerializerSupport
          if (JavaUtils.isPrimitive(value.getClass()))
             value = JavaUtils.getWrapperValueArray(value);
 
-         String nodeName = new NameImpl(compXmlName).getQualifiedName();
+         String nodeName = getQualifiedName(compXmlName);
 
          buffer = new StringBuilder("<" + nodeName + " xmlns:" + Constants.PREFIX_SOAP11_ENC + "='" + Constants.URI_SOAP11_ENC + "' ");
 
          if (!(value instanceof Object[]))
-            throw new WSException("Unsupported array type: " + javaType);
+            throw MESSAGES.unsupportedArrayType(javaType);
 
          Object[] objArr = (Object[])value;
          String arrayDim = "" + objArr.length;
@@ -165,6 +164,15 @@ public class SOAPArraySerializer extends SerializerSupport
       {
          throw new BindingException(e);
       }
+   }
+
+   private String getQualifiedName(QName qname)
+   {
+      String prefix = qname.getPrefix();
+      if (prefix.length() > 0)
+         return prefix + ":" + qname.getLocalPart();
+      else
+         return qname.getLocalPart();
    }
 
    private void serializeArrayComponents(QName xmlName, QName xmlType, SerializationContext serContext, Object[] objArr) throws BindingException

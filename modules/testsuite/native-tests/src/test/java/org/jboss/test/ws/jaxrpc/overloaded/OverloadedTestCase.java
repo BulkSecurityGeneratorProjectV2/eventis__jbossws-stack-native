@@ -26,6 +26,7 @@ import javax.xml.rpc.Service;
 
 import junit.framework.Test;
 
+import org.jboss.wsf.test.CleanupOperation;
 import org.jboss.wsf.test.JBossWSTest;
 import org.jboss.wsf.test.JBossWSTestSetup;
 
@@ -37,10 +38,16 @@ import org.jboss.wsf.test.JBossWSTestSetup;
 public class OverloadedTestCase extends JBossWSTest
 {
    private static Overloaded endpoint;
+   private static InitialContext iniCtx;
 
    public static Test suite()
    {
-      return new JBossWSTestSetup(OverloadedTestCase.class, "jaxrpc-overloaded.war, jaxrpc-overloaded-client.jar");
+      return new JBossWSTestSetup(OverloadedTestCase.class, "jaxrpc-overloaded.war, jaxrpc-overloaded-appclient.ear#jaxrpc-overloaded-appclient.jar", new CleanupOperation() {
+         @Override
+         public void cleanUp() {
+            endpoint = null;
+         }
+      });
    }
 
    protected void setUp() throws Exception
@@ -49,9 +56,18 @@ public class OverloadedTestCase extends JBossWSTest
 
       if (endpoint == null)
       {
-         InitialContext iniCtx = getInitialContext();
-         Service service = (Service)iniCtx.lookup("java:comp/env/service/OverloadedTestService");
+         iniCtx = getAppclientInitialContext();
+         Service service = (Service)iniCtx.lookup("java:service/OverloadedTestService");
          endpoint = (Overloaded)service.getPort(Overloaded.class);
+      }
+   }
+
+   protected void tearDown() throws Exception
+   {
+      if (iniCtx != null)
+      {
+         iniCtx.close();
+         iniCtx = null;
       }
    }
 

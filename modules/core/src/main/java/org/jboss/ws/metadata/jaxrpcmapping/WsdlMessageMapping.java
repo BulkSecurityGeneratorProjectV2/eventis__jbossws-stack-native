@@ -25,6 +25,8 @@ import java.io.Serializable;
 
 import javax.xml.namespace.QName;
 
+import org.jboss.ws.NativeMessages;
+
 /**
  * Created by IntelliJ IDEA.
  *
@@ -64,7 +66,7 @@ public class WsdlMessageMapping implements Serializable
    public void setParameterMode(String parameterMode)
    {
       if ("IN".equals(parameterMode) == false && "OUT".equals(parameterMode) == false && "INOUT".equals(parameterMode) == false)
-         throw new IllegalArgumentException("Invalid parameter mode: " + parameterMode);
+         throw NativeMessages.MESSAGES.invalidParameterMode(parameterMode);
       this.parameterMode = parameterMode;
    }
 

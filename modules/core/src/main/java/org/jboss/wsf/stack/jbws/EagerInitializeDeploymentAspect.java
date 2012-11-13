@@ -21,8 +21,10 @@
  */
 package org.jboss.wsf.stack.jbws;
 
+import org.jboss.ws.NativeMessages;
+import org.jboss.ws.common.integration.AbstractDeploymentAspect;
+import org.jboss.ws.common.utils.DelegateClassLoader;
 import org.jboss.ws.metadata.umdm.UnifiedMetaData;
-import org.jboss.wsf.common.integration.AbstractDeploymentAspect;
 import org.jboss.wsf.spi.deployment.Deployment;
 
 /**
@@ -38,13 +40,13 @@ public class EagerInitializeDeploymentAspect extends AbstractDeploymentAspect
    {
       UnifiedMetaData umd = dep.getAttachment(UnifiedMetaData.class);
       if (umd == null)
-         throw new IllegalStateException("Cannot obtain unified meta data");
+         throw NativeMessages.MESSAGES.cannotObtainUnifiedMetaData(dep);
 
       ClassLoader runtimeClassLoader = dep.getRuntimeClassLoader();
       if(null == runtimeClassLoader)
-         throw new IllegalArgumentException("Runtime classloader may not be null");
+         throw NativeMessages.MESSAGES.missingRuntimeClassLoader(dep);
       
-      umd.setClassLoader(runtimeClassLoader);
+      umd.setClassLoader(new DelegateClassLoader(runtimeClassLoader, SecurityActions.getContextClassLoader()));
       umd.eagerInitialize();
    }
 }

@@ -21,24 +21,9 @@
  */
 package org.jboss.ws.core;
 
-import java.util.Observable;
-
-import javax.xml.ws.EndpointReference;
-import javax.xml.ws.http.HTTPBinding;
-import javax.xml.ws.soap.SOAPBinding;
-import javax.xml.ws.wsaddressing.W3CEndpointReference;
-import javax.xml.ws.wsaddressing.W3CEndpointReferenceBuilder;
-
-import org.jboss.logging.Logger;
 import org.jboss.ws.core.jaxrpc.SOAP11BindingJAXRPC;
 import org.jboss.ws.core.jaxrpc.SOAP12BindingJAXRPC;
-import org.jboss.ws.core.jaxws.binding.HTTPBindingJAXWS;
-import org.jboss.ws.core.jaxws.binding.SOAP11BindingJAXWS;
-import org.jboss.ws.core.jaxws.binding.SOAP12BindingJAXWS;
-import org.jboss.ws.core.jaxws.wsaddressing.EndpointReferenceUtil;
-import org.jboss.ws.metadata.config.Configurable;
 import org.jboss.ws.metadata.umdm.EndpointMetaData;
-import org.jboss.ws.metadata.umdm.EndpointMetaData.Type;
 
 /**
  * Provides access to the protocol binding.
@@ -47,9 +32,17 @@ import org.jboss.ws.metadata.umdm.EndpointMetaData.Type;
  * @author Heiko.Braun@jboss.com
  * @since 04-Jul-2006
  */
-public class CommonBindingProvider implements Configurable
+public class CommonBindingProvider
 {
-   private static Logger log = Logger.getLogger(CommonBindingProvider.class);
+   /**
+    * A constant representing the identity of the SOAP 1.1 over HTTP binding.
+    */
+   private static final String SOAP11HTTP_BINDING = "http://schemas.xmlsoap.org/wsdl/soap/http";
+
+   /**
+    * A constant representing the identity of the SOAP 1.2 over HTTP binding.
+    */
+   private static final String SOAP12HTTP_BINDING = "http://www.w3.org/2003/05/soap/bindings/HTTP/";
 
    protected EndpointMetaData epMetaData;
    protected CommonBinding binding;
@@ -57,97 +50,28 @@ public class CommonBindingProvider implements Configurable
    public CommonBindingProvider(EndpointMetaData epMetaData)
    {
       this.epMetaData = epMetaData;
-      initBinding(epMetaData.getBindingId(), epMetaData.getType());
-
-      this.epMetaData.registerConfigObserver(this);
-      configure();
+      initBinding(epMetaData.getBindingId());
    }
 
-   public CommonBindingProvider(String bindingId, Type type)
+   public CommonBindingProvider(String bindingId)
    {
-      initBinding(bindingId, type);
-      configure();
+      initBinding(bindingId);
    }
 
-   private void configure()
+   protected void initBinding(String bindingId)
    {
-      // process MTOM config elements
-      if (epMetaData != null)
+      if (SOAP11HTTP_BINDING.equals(bindingId))
       {
-         epMetaData.configure(this);
+         binding = new SOAP11BindingJAXRPC();
       }
-   }
-
-   protected void initBinding(String bindingId, Type type)
-   {
-      if (SOAPBinding.SOAP11HTTP_BINDING.equals(bindingId))
+      else if (SOAP12HTTP_BINDING.equals(bindingId))
       {
-         binding = (type == Type.JAXWS ? new SOAP11BindingJAXWS() : new SOAP11BindingJAXRPC());
-      }
-      else if (SOAPBinding.SOAP11HTTP_MTOM_BINDING.equals(bindingId))
-      {
-         binding = (type == Type.JAXWS ? new SOAP11BindingJAXWS(true) : new SOAP11BindingJAXRPC(true));
-      }
-      else if (SOAPBinding.SOAP12HTTP_BINDING.equals(bindingId))
-      {
-         binding = (type == Type.JAXWS ? new SOAP12BindingJAXWS() : new SOAP12BindingJAXRPC());
-      }
-      else if (SOAPBinding.SOAP12HTTP_MTOM_BINDING.equals(bindingId))
-      {
-         binding = (type == Type.JAXWS ? new SOAP12BindingJAXWS(true) : new SOAP12BindingJAXRPC(true));
-      }
-      else if (HTTPBinding.HTTP_BINDING.equals(bindingId))
-      {
-         binding = new HTTPBindingJAXWS();
+         binding = new SOAP12BindingJAXRPC();
       }
    }
 
    public CommonBinding getCommonBinding()
    {
       return binding;
-   }
-
-   public EndpointReference getEndpointReference()
-   {
-      if (binding instanceof HTTPBinding )
-      {
-         throw new UnsupportedOperationException("Cannot get EPR for BindingProvider instances using the XML/HTTP binding");
-      }
-      return getEndpointReference(W3CEndpointReference.class);
-   }
-
-   public <T extends EndpointReference> T getEndpointReference(Class<T> clazz)
-   {
-      // Conformance 4.5 (javax.xml.ws.BindingProvider.getEndpointReference): An implementation
-      // MUST be able to return an javax.xml.ws.EndpointReference for the target endpoint if a SOAP binding
-      // is being used. If the BindingProvider instance has a binding that is either SOAP 1.1/HTTP or
-      // SOAP 1.2/HTTP, then a W3CEndpointReference MUST be returned. If the binding is XML/HTTP an
-      // java.lang.UnsupportedOperationExceptionMUST be thrown.
-
-      if (binding instanceof HTTPBinding )
-      {
-         throw new UnsupportedOperationException("Cannot get epr for BindingProvider instances using the XML/HTTP binding");
-      }
-      if (epMetaData == null)
-         throw new IllegalStateException("Cannot get endpoint reference info from endpoint metadata!");
-         
-      if (epMetaData.getEndpointReference() != null)
-      {
-         return EndpointReferenceUtil.transform(clazz, epMetaData.getEndpointReference());      
-      }
-      
-      W3CEndpointReferenceBuilder builder = new W3CEndpointReferenceBuilder();
-      builder.address(epMetaData.getEndpointAddress());
-      builder.serviceName(epMetaData.getServiceMetaData().getServiceName());
-      builder.endpointName(epMetaData.getPortName());
-      builder.wsdlDocumentLocation(epMetaData.getEndpointAddress() + "?wsdl");
-      
-      return EndpointReferenceUtil.transform(clazz, builder.build());
-   }
-
-   public void update(Observable observable, Object object)
-   {
-      if(log.isDebugEnabled()) log.debug("Update config: " + object);
-      configure();
    }
 }

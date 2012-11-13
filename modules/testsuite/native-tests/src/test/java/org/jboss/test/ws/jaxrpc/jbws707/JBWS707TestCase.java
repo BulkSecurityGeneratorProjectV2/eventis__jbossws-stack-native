@@ -28,13 +28,15 @@ import javax.naming.InitialContext;
 import javax.xml.rpc.Service;
 import javax.xml.soap.MessageFactory;
 import javax.xml.soap.MimeHeaders;
+import javax.xml.soap.SOAPBody;
 import javax.xml.soap.SOAPElement;
 import javax.xml.soap.SOAPException;
 import javax.xml.soap.SOAPMessage;
 
 import junit.framework.Test;
 
-import org.jboss.ws.core.soap.SOAPBodyImpl;
+import org.jboss.ws.core.soap.utils.SOAPUtils;
+import org.jboss.wsf.test.CleanupOperation;
 import org.jboss.wsf.test.JBossWSTest;
 import org.jboss.wsf.test.JBossWSTestSetup;
 import org.w3c.dom.Node;
@@ -54,11 +56,17 @@ import org.w3c.dom.NodeList;
 public class JBWS707TestCase extends JBossWSTest
 {
    private static TestEndpoint port;
+   private static InitialContext iniCtx;
    
    /** Deploy the test */
    public static Test suite() throws Exception
    {
-      return new JBossWSTestSetup(JBWS707TestCase.class, "jaxrpc-jbws707.war, jaxrpc-jbws707-client.jar");
+      return new JBossWSTestSetup(JBWS707TestCase.class, "jaxrpc-jbws707.war, jaxrpc-jbws707-appclient.ear#jaxrpc-jbws707-appclient.jar", new CleanupOperation() {
+         @Override
+         public void cleanUp() {
+            port = null;
+         }
+      });
    }
 
    public void setUp() throws Exception
@@ -66,12 +74,22 @@ public class JBWS707TestCase extends JBossWSTest
       super.setUp();
       if (port == null)
       {
-         InitialContext iniCtx = getInitialContext();
-         Service service = (Service)iniCtx.lookup("java:comp/env/service/TestService");
+         iniCtx = getAppclientInitialContext();
+         Service service = (Service)iniCtx.lookup("java:service/TestService");
          port = (TestEndpoint)service.getPort(TestEndpoint.class);
       }
    }
    
+   protected void tearDown() throws Exception
+   {
+      if (iniCtx != null)
+      {
+         iniCtx.close();
+         iniCtx = null;
+      }
+      super.tearDown();
+   }
+
    public void testSpecialChars() throws Exception
    {
       String inStr = "&Test & this &";
@@ -184,8 +202,8 @@ public class JBWS707TestCase extends JBossWSTest
       mimeHeaders.addHeader("Content-Type", "text/xml; charset=UTF-8");
 
       SOAPMessage soapMessage = mf.createMessage(mimeHeaders, new ByteArrayInputStream(xmlStr.getBytes()));
-      SOAPBodyImpl soapBody = (SOAPBodyImpl)soapMessage.getSOAPBody();
-      SOAPElement soapElement = soapBody.getBodyElement();
+      SOAPBody soapBody = (SOAPBody)soapMessage.getSOAPBody();
+      SOAPElement soapElement = SOAPUtils.getFirstSOAPBodyElement(soapBody);
       
       StringBuffer builder = new StringBuffer();
       NodeList nlist = soapElement.getChildNodes();

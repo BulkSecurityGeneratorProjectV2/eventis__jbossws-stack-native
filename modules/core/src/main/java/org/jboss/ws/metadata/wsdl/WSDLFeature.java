@@ -23,6 +23,8 @@ package org.jboss.ws.metadata.wsdl;
 
 import java.io.Serializable;
 
+import org.jboss.ws.NativeMessages;
+
 /**
  * A feature component describes an abstract piece of functionality typically associated with the exchange of
  * messages between communicating parties. Although WSDL poses no constraints on the potential scope of
@@ -46,7 +48,7 @@ public class WSDLFeature implements Serializable
    public WSDLFeature(String uri)
    {
       if (uri == null)
-         throw new IllegalArgumentException("Illegal feature URI: " + uri);
+         throw NativeMessages.MESSAGES.illegalFeatureURI(uri);
 
       this.uri = uri;
    }
@@ -54,7 +56,7 @@ public class WSDLFeature implements Serializable
    public WSDLFeature(String uri, boolean required)
    {
       if (uri == null)
-         throw new IllegalArgumentException("Illegal feature URI: " + uri);
+         throw NativeMessages.MESSAGES.illegalFeatureURI(uri);
 
       this.uri = uri;
       this.required = required;

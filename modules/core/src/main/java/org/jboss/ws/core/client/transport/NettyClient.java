@@ -37,9 +37,7 @@ import java.util.regex.Pattern;
 
 import javax.net.ssl.SSLEngine;
 import javax.xml.rpc.Stub;
-import javax.xml.ws.BindingProvider;
 
-import org.jboss.logging.Logger;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBufferOutputStream;
 import org.jboss.netty.buffer.ChannelBuffers;
@@ -52,19 +50,15 @@ import org.jboss.netty.handler.codec.http.HttpMethod;
 import org.jboss.netty.handler.codec.http.HttpRequest;
 import org.jboss.netty.handler.codec.http.HttpVersion;
 import org.jboss.netty.handler.ssl.SslHandler;
-import org.jboss.security.Base64Encoder;
-import org.jboss.ws.core.CommonMessageContext;
+import org.jboss.util.Base64;
+import org.jboss.ws.NativeLoggers;
+import org.jboss.ws.NativeMessages;
 import org.jboss.ws.core.StubExt;
 import org.jboss.ws.core.WSTimeoutException;
 import org.jboss.ws.core.client.Marshaller;
 import org.jboss.ws.core.client.UnMarshaller;
 import org.jboss.ws.core.client.ssl.SSLContextFactory;
 import org.jboss.ws.core.client.transport.WSResponseHandler.Result;
-import org.jboss.ws.core.soap.MessageContextAssociation;
-import org.jboss.ws.feature.FastInfosetFeature;
-import org.jboss.ws.metadata.config.CommonConfig;
-import org.jboss.ws.metadata.config.EndpointProperty;
-import org.jboss.ws.metadata.umdm.EndpointMetaData;
 
 /**
  * A http client using Netty
@@ -79,7 +73,6 @@ public class NettyClient
    public static final String RESPONSE_CODE_MESSAGE = "org.jboss.ws.core.client.transport.NettyClient#ResponseCodeMessage";
    public static final String PROTOCOL = "org.jboss.ws.core.client.transport.NettyClient#Protocol";
    public static final String RESPONSE_HEADERS = "org.jboss.ws.core.client.transport.NettyClient#ResponseHeaders";
-   private static Logger log = Logger.getLogger(NettyClient.class);
    
    private Marshaller marshaller;
    private UnMarshaller unmarshaller;
@@ -126,7 +119,7 @@ public class NettyClient
 	   {
 		   if (NettyTransportHandler.getHttpKeepAliveSet())
 		   {
-			   log.info("Retrying with a new connection..."); //because using keep-alive connections it's possible to try re-using closed connections before they've been evicted
+			   //because using keep-alive connections it's possible to try re-using closed connections before they've been evicted
 			   return invokeInternal(reqMessage, targetAddress, oneway, additionalHeaders, callProps);
 		   }
 		   else
@@ -145,7 +138,7 @@ public class NettyClient
       }
       catch (MalformedURLException e)
       {
-         throw new RuntimeException("Invalid address: " + targetAddress, e);
+         throw new RuntimeException(e);
       }
       
       NettyTransportHandler transport = NettyTransportHandler.getInstance(target, NettyHelper.getChannelPipelineFactory(getSSLHandler(target, callProps)));
@@ -217,10 +210,12 @@ public class NettyClient
         	 Throwable t = ee.getCause();
         	 throw t != null ? t : ee;
          }
-	 catch (TimeoutException te) 
-	 {
-	    throw new WSTimeoutException("Receive timeout", receiveTimeout == null ? -1 : receiveTimeout);
-	 }
+      	 catch (TimeoutException te) 
+      	 {
+      	    WSTimeoutException e = NativeMessages.MESSAGES.receiveTimeout();
+      	    e.setTimeout(receiveTimeout == null ? -1 : receiveTimeout);
+      	    throw e;
+      	 }
          resHeaders = result.getResponseHeaders();
          resMetadata = result.getMetadata();
          Object resMessage = oneway ? null : unmarshaller.read(result.getResponse(), resMetadata, resHeaders);
@@ -236,7 +231,7 @@ public class NettyClient
       }
       catch (ClosedChannelException cce)
       {
-         log.error("Channel closed by remote peer while sending message");
+         NativeLoggers.CLIENT_LOGGER.channelClosed();
          transport.end();
          throw cce;
       }
@@ -247,7 +242,7 @@ public class NettyClient
       }
       catch (TimeoutException te) 
       {
-	 throw new WSTimeoutException("Connection timeout", connectionTimeout == null ? -1 : connectionTimeout);
+         throw NativeMessages.MESSAGES.connectionTimeout(connectionTimeout == null ? -1 : connectionTimeout);
       }
       catch (IOException ioe)
       {
@@ -259,7 +254,7 @@ public class NettyClient
       }
       catch (Throwable t)
       {
-         IOException io = new IOException("Could not transmit message");
+         IOException io = NativeMessages.MESSAGES.couldNotTransmitMessage();
          io.initCause(t);
          transport.end();
          throw io;
@@ -343,21 +338,6 @@ public class NettyClient
    {
       if (HttpMethod.POST.equals(message.getMethod()))
       {
-         CommonMessageContext msgContext = MessageContextAssociation.peekMessageContext();
-         //Overwrite, through endpoint config
-         if (msgContext != null)
-         {
-            EndpointMetaData epMetaData = msgContext.getEndpointMetaData();
-            CommonConfig config = epMetaData.getConfig();
-
-            String sizeValue = config.getProperty(EndpointProperty.CHUNKED_ENCODING_SIZE);
-            if (sizeValue != null)
-               chunkSize = Integer.valueOf(sizeValue);
-
-            //fastinfoset always disable chunking
-            if (epMetaData.isFeatureEnabled(FastInfosetFeature.class))
-               chunkSize = 0;
-         }
          //override using call props
          try
          {
@@ -367,7 +347,7 @@ public class NettyClient
          }
          catch (Exception e)
          {
-            log.warn("Can't set chunk size from call properties, illegal value provided!");
+            NativeLoggers.CLIENT_LOGGER.cannotSetChunkSize();
          }
       }
    }
@@ -400,11 +380,6 @@ public class NettyClient
          authType = StubExt.PROPERTY_AUTH_TYPE_BASIC;
       String username = (String)callProps.get(Stub.USERNAME_PROPERTY);
       String password = (String)callProps.get(Stub.PASSWORD_PROPERTY);
-      if (username == null || password == null)
-      {
-         username = (String)callProps.get(BindingProvider.USERNAME_PROPERTY);
-         password = (String)callProps.get(BindingProvider.PASSWORD_PROPERTY);
-      }
       if (username != null && password != null)
       {
          if (authType.equals(StubExt.PROPERTY_AUTH_TYPE_BASIC))
@@ -416,7 +391,7 @@ public class NettyClient
 
    private static String getBasicAuthHeader(String username, String password) throws IOException
    {
-      return "Basic " + Base64Encoder.encode(username + ":" + password);
+      return "Basic " + new String(Base64.encodeBytes((username + ":" + password).getBytes("ISO-8859-1"), Base64.DONT_BREAK_LINES));
    }
 
    /**

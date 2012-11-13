@@ -26,12 +26,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.UnknownHostException;
+import java.util.List;
 
 import javax.xml.namespace.QName;
 
 import org.jboss.ws.core.server.WSDLRequestHandler;
-import org.jboss.wsf.common.DOMUtils;
+import org.jboss.ws.common.DOMUtils;
 import org.jboss.wsf.spi.management.ServerConfig;
+import org.jboss.wsf.spi.metadata.config.ClientConfig;
+import org.jboss.wsf.spi.metadata.config.EndpointConfig;
 import org.jboss.wsf.test.JBossWSTest;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -181,7 +184,17 @@ public class WSDLRequestHandlerTestCase extends JBossWSTest
          this.webServiceSecurePort = webServiceSecurePort;
       }
       
-      public String getWebServiceHost()
+	  public void addClientConfig(ClientConfig config)
+      {
+         // does nothing
+	  }
+
+	  public List<ClientConfig> getClientConfigs()
+      {
+         return null;
+	  }
+
+	  public String getWebServiceHost()
       {
          return webServiceHost;
       }
@@ -246,6 +259,19 @@ public class WSDLRequestHandlerTestCase extends JBossWSTest
       }
 
       public File getServerTempDir()
+      {
+         // TODO Auto-generated method stub
+         return null;
+      }
+
+      @Override
+      public void addEndpointConfig(EndpointConfig config)
+      {
+         // TODO Auto-generated method stub
+      }
+
+      @Override
+      public List<EndpointConfig> getEndpointConfigs()
       {
          // TODO Auto-generated method stub
          return null;

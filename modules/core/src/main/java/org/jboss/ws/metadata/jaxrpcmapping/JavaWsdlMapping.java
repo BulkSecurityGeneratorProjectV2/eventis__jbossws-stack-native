@@ -28,7 +28,7 @@ import java.util.List;
 
 import javax.xml.namespace.QName;
 
-import org.jboss.logging.Logger;
+import org.jboss.ws.NativeLoggers;
 
 /**
  * XML mapping of the java-wsdl-mapping root element in jaxrpc-mapping.xml
@@ -39,9 +39,6 @@ import org.jboss.logging.Logger;
 public class JavaWsdlMapping implements Serializable
 {
    private static final long serialVersionUID = -142671631068024054L;
-
-   // provide logging
-   private static Logger log = Logger.getLogger(JavaWsdlMapping.class);
 
    // One or more <package-mapping> elements
    private List packageMappings = new ArrayList();
@@ -142,7 +139,7 @@ public class JavaWsdlMapping implements Serializable
          }
 
          if (typeMapping == null)
-            log.warn("Cannot find jaxrpc-mapping for type: " + xmlType);
+            NativeLoggers.ROOT_LOGGER.cannotFindJAXRPCMappingForType(xmlType);
       }
 
       return typeMapping;

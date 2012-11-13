@@ -30,6 +30,7 @@ import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelFuture;
 import org.jboss.netty.handler.codec.http.DefaultHttpChunk;
 import org.jboss.netty.handler.codec.http.HttpChunk;
+import org.jboss.ws.NativeMessages;
 
 /**
  * An output stream that sends messages using Netty.
@@ -61,7 +62,7 @@ public class NettyTransportOutputStream extends OutputStream
       this.channel = channel;
       if (chunkSize <= 0)
       {
-         throw new IllegalArgumentException("Invalid chunk size (must be greater than 0)");
+         throw NativeMessages.MESSAGES.invalidChunkSize(chunkSize);
       }
       this.cur = 0;
       this.buffer = new byte[chunkSize];
@@ -152,7 +153,7 @@ public class NettyTransportOutputStream extends OutputStream
    {
       if (!closed)
       {
-         throw new IllegalStateException("Cannot get channel future before closing the stream.");
+         throw NativeMessages.MESSAGES.cannotGetChannelFuture();
       }
       return future;
    }

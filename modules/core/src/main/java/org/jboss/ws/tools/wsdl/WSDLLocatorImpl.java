@@ -21,6 +21,8 @@
  */
 package org.jboss.ws.tools.wsdl;
 
+import static org.jboss.ws.NativeMessages.MESSAGES;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
@@ -30,8 +32,8 @@ import java.net.URL;
 import javax.wsdl.xml.WSDLLocator;
 
 import org.jboss.logging.Logger;
-import org.jboss.ws.WSException;
-import org.jboss.ws.core.utils.ResourceURL;
+import org.jboss.ws.NativeLoggers;
+import org.jboss.ws.common.utils.ResourceURL;
 import org.xml.sax.EntityResolver;
 import org.xml.sax.InputSource;
 
@@ -49,7 +51,7 @@ class WSDLLocatorImpl implements WSDLLocator
    public WSDLLocatorImpl(EntityResolver entityResolver, URL wsdlLocation)
    {
       if (wsdlLocation == null)
-         throw new IllegalArgumentException("WSDL file argument cannot be null");
+         throw MESSAGES.wsdlFileArgumentCannotBeNull();
 
       this.entityResolver = entityResolver;
       this.wsdlLocation = wsdlLocation;
@@ -62,13 +64,13 @@ class WSDLLocatorImpl implements WSDLLocator
       {
          InputStream inputStream = new ResourceURL(wsdlLocation).openStream();
          if (inputStream == null)
-            throw new IllegalArgumentException("Cannot obtain wsdl from [" + wsdlLocation + "]");
+            throw MESSAGES.cannotObtainWsdlFrom(wsdlLocation);
 
          return new InputSource(inputStream);
       }
       catch (IOException e)
       {
-         throw new RuntimeException("Cannot access wsdl from [" + wsdlLocation + "], " + e.getMessage());
+         throw MESSAGES.cannotAccessWsdlFrom(wsdlLocation, e);
       }
    }
 
@@ -88,7 +90,7 @@ class WSDLLocatorImpl implements WSDLLocator
       }
       catch (MalformedURLException e)
       {
-         log.error("Not a valid URL: " + parent);
+         NativeLoggers.ROOT_LOGGER.notAValidUrl(parent);
          return null;
       }
 
@@ -108,7 +110,7 @@ class WSDLLocatorImpl implements WSDLLocator
             }
             catch (Exception e)
             {
-               throw new IllegalArgumentException("Cannot resolve imported resource: " + resource);
+               throw MESSAGES.cannotResolveImportedResource(resource);
             }
             final String path = uri.getPath();
             final String query = uri.getQuery() != null ? "?" + uri.getQuery() : "";
@@ -156,7 +158,7 @@ class WSDLLocatorImpl implements WSDLLocator
          }
          else
          {
-            throw new IllegalArgumentException("Cannot resolve imported resource: " + wsdlImport);
+            throw MESSAGES.cannotResolveImportedResource(wsdlImport);
          }
 
          return inputSource;
@@ -167,7 +169,7 @@ class WSDLLocatorImpl implements WSDLLocator
       }
       catch (Exception e)
       {
-         throw new WSException("Cannot access imported wsdl [" + wsdlImport + "], " + e.getMessage());
+         throw MESSAGES.cannotAccessImportedWsdl(wsdlImport, e);
       }
    }
 

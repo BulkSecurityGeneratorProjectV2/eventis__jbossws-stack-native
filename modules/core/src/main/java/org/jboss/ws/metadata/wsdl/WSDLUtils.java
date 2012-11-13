@@ -21,6 +21,8 @@
  */
 package org.jboss.ws.metadata.wsdl;
 
+import static org.jboss.ws.NativeMessages.MESSAGES;
+
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -39,8 +41,6 @@ import java.util.Stack;
 import java.util.StringTokenizer;
 
 import javax.ejb.SessionBean;
-import javax.jws.WebMethod;
-import javax.jws.WebService;
 import javax.xml.namespace.QName;
 import javax.xml.rpc.holders.BigDecimalHolder;
 import javax.xml.rpc.holders.BigIntegerHolder;
@@ -67,12 +67,12 @@ import javax.xml.rpc.holders.StringHolder;
 
 import org.apache.xerces.xs.XSComplexTypeDefinition;
 import org.apache.xerces.xs.XSTypeDefinition;
-import org.jboss.ws.Constants;
 import org.jboss.ws.WSException;
+import org.jboss.ws.common.Constants;
+import org.jboss.ws.common.JavaUtils;
 import org.jboss.ws.core.jaxrpc.ParameterWrapping;
 import org.jboss.ws.core.utils.HolderUtils;
 import org.jboss.ws.metadata.wsdl.xmlschema.JBossXSModel;
-import org.jboss.wsf.common.JavaUtils;
 import org.jboss.xb.binding.Util;
 
 /**
@@ -87,15 +87,14 @@ public class WSDLUtils
    private String newline = "\n";
    private static WSDLUtils instance = new WSDLUtils();
 
-   private List wrapperlist = null;
-   private List primlist = null;
+   private List<String> wrapperlist = null;
+   private List<String> primlist = null;
 
-   private final Map primitiveMap = new HashMap();
+   private final Map<String, String> primitiveMap = new HashMap<String, String>();
 
-   private final static Map<String, Class> schemaBasicTypes = new HashMap<String, Class>();
-
-   private final static Map<Class, Class> holderTypes = new HashMap<Class, Class>();
-   private final static Map<Class, Class> reverseHolderTypes = new HashMap<Class, Class>();
+   private final static Map<String, Class<?>> schemaBasicTypes = new HashMap<String, Class<?>>();
+   private final static Map<Class<?>, Class<?>> holderTypes = new HashMap<Class<?>, Class<?>>();
+   private final static Map<Class<?>, Class<?>> reverseHolderTypes = new HashMap<Class<?>, Class<?>>();
 
    // Skip these methods when generating wsdl operations
    private List<String> ignoredMethods;
@@ -236,10 +235,10 @@ public class WSDLUtils
     * @param cls
     * @return true if class belongs to java.* or javax.* package
     */
-   public boolean checkIgnoreClass(Class cls)
+   public boolean checkIgnoreClass(Class<?> cls)
    {
       if (cls == null)
-         throw new IllegalArgumentException("Illegal null argument:cls");
+         throw MESSAGES.illegalNullArgument("cls");
       //if (cls.isArray()) cls = cls.getComponentType();
       if (!cls.isArray())
       {
@@ -270,52 +269,6 @@ public class WSDLUtils
       }
 
       return ignoredMethods.contains(method.getName());
-   }
-   
-   /**
-    * The public, non-static or non-final methods that satisfy one of the following conditions:
-    * 1. They are annotated with the javax.jws.WebMethod annotation with the exclude element set to
-    * false or missing (since false is the default for this annotation element).
-    * 2. They are not annotated with the javax.jws.WebMethod annotation but their declaring class has a
-    * javax.jws.WebService annotation.
-    * @param method to process
-    * @return true if webmethod, false otherwise
-    */
-   public static boolean isWebMethod(final Method method, final boolean definedInInterface)
-   {
-      if (!isWebMethodCandidate(method))
-         return false;
-         
-      final WebMethod webMethodAnnotation = method.getAnnotation(WebMethod.class);
-      
-      if (webMethodAnnotation != null)
-      {
-         return !webMethodAnnotation.exclude();
-      }
-      if (definedInInterface)
-      {
-         return true;
-      }
-      else
-      {
-         return method.getDeclaringClass().getAnnotation(WebService.class) != null;
-      }
-   }
-   
-   /**
-    * Only public, non-static and non-final methods are web method candidates.
-    *
-    * @param method to process
-    * @return true if satisfies modifier requirements, false otherwise
-    */
-   private static boolean isWebMethodCandidate(final Method method)
-   {
-      final int modifiers = method.getModifiers();
-      final boolean isPublic = Modifier.isPublic(modifiers);
-      final boolean isNotStatic = !Modifier.isStatic(modifiers);
-      final boolean isNotFinal = !Modifier.isFinal(modifiers);
-      
-      return isPublic && isNotStatic && isNotFinal;
    }
    
    /**
@@ -354,9 +307,9 @@ public class WSDLUtils
    public File createPackage(String path, String packageName)
    {
       if (packageName == null)
-         throw new IllegalArgumentException("Illegal Null Argument: packageName");
+         throw MESSAGES.illegalNullArgument("packageName");
       if (path == null)
-         throw new IllegalArgumentException("Illegal Null Argument: path");
+         throw MESSAGES.illegalNullArgument("path");
       String pac = packageName.replace('.', '/');
       File dir = new File(path + "/" + pac);
       dir.mkdirs();
@@ -373,9 +326,9 @@ public class WSDLUtils
    public File createPhysicalFile(File loc, String fname) throws IOException
    {
       if (loc == null)
-         throw new IllegalArgumentException("Illegal Null Argument: loc");
+         throw MESSAGES.illegalNullArgument("loc");
       if (fname == null)
-         throw new IllegalArgumentException("Illegal Null Argument: fname");
+         throw MESSAGES.illegalNullArgument("fname");
       File javaFile = new File(loc.getAbsolutePath() + "/" + fname + ".java");
       //Delete the javaFile if already exists
       if (javaFile.exists())
@@ -394,7 +347,7 @@ public class WSDLUtils
     * @param importList  Strings representing imports
     * @return
     */
-   public StringBuilder createClassBasicStructure(String pkgname, String fname, XSTypeDefinition type, List importList, String baseName)
+   public StringBuilder createClassBasicStructure(String pkgname, String fname, XSTypeDefinition type, List<?> importList, String baseName)
    {
       StringBuilder buf = new StringBuilder();
       writeJbossHeader(buf);
@@ -404,7 +357,7 @@ public class WSDLUtils
       buf.append(newline);
       if (importList != null)
       {
-         Iterator iter = importList.iterator();
+         Iterator<?> iter = importList.iterator();
          while (iter.hasNext())
          {
             buf.append("import " + (String)iter.next() + ";");
@@ -448,7 +401,7 @@ public class WSDLUtils
     * @param name  Field name to check
     * @return true - if public field exists, false-otherwise
     */
-   public boolean doesPublicFieldExist(Class javaType, String name)
+   public boolean doesPublicFieldExist(Class<?> javaType, String name)
    {
       Field fld = null;
       try
@@ -477,7 +430,7 @@ public class WSDLUtils
    public String firstLetterUpperCase(String fname)
    {
       if (fname == null || fname.length() == 0)
-         throw new WSException("String passed is null");
+         throw MESSAGES.stringPassedIsNull();
       //Ensure that the first character is uppercase
       final char firstChar = fname.charAt(0);
       if (Character.isLowerCase(firstChar))
@@ -494,10 +447,10 @@ public class WSDLUtils
     * @param arr
     * @return dimension of an array
     */
-   public int getArrayDimension(Class arr)
+   public int getArrayDimension(Class<?> arr)
    {
       if (arr == null || arr.isArray() == false)
-         throw new IllegalArgumentException("Illegal null or array arg:arr");
+         throw MESSAGES.illegalNullOrArrayArgument(arr);
       int counter = 0;
       while (arr.isArray())
       {
@@ -513,7 +466,7 @@ public class WSDLUtils
     * @param cls
     * @return Jaxrpc Holder object if exists
     */
-   public Class getHolder(Class cls)
+   public Class<?> getHolder(Class<?> cls)
    {
       return holderTypes.get(cls);
    }
@@ -524,7 +477,7 @@ public class WSDLUtils
     * @param cls The jaxrpc holder type
     * @return Jaxrpc Holder object if exists
     */
-   public Class getJavaTypeForHolder(Class cls)
+   public Class<?> getJavaTypeForHolder(Class<?> cls)
    {
       if (Holder.class.isAssignableFrom(cls))
          return HolderUtils.getValueType(cls);
@@ -539,7 +492,7 @@ public class WSDLUtils
     * @return
     */
 
-   public String getMessagePartForArray(Class javaType)
+   public String getMessagePartForArray(Class<?> javaType)
    {
       StringBuilder sb = new StringBuilder();
       while (javaType.isArray())
@@ -559,13 +512,13 @@ public class WSDLUtils
     * @return just the classname
     */
 
-   public static String getJustClassName(Class cls)
+   public static String getJustClassName(Class<?> cls)
    {
       if (cls == null)
          return null;
       if (cls.isArray())
       {
-         Class c = cls.getComponentType();
+         Class<?> c = cls.getComponentType();
          return getJustClassName(c.getName());
       }
 
@@ -591,9 +544,9 @@ public class WSDLUtils
     * From the list of fields defined by this class (not superclasses)
     * get the fields that are relevant (public)
     */
-   public Field[] getPublicFields(Class cls)
+   public Field[] getPublicFields(Class<?> cls)
    {
-      ArrayList list = new ArrayList();
+      ArrayList<Field> list = new ArrayList<Field>();
 
       Field[] fld = cls.getDeclaredFields();
       for (int i = 0; i < fld.length; i++)
@@ -619,7 +572,7 @@ public class WSDLUtils
     */
    public Method[] getPublicProtectedMethods(Method[] methods)
    {
-      ArrayList list = new ArrayList();
+      ArrayList<Method> list = new ArrayList<Method>();
       int len = methods.length;
 
       for (int i = 0; i < len; i++)
@@ -642,12 +595,12 @@ public class WSDLUtils
     * @param xmlType
     * @return
     */
-   public Class getJavaType(QName xmlType)
+   public Class<?> getJavaType(QName xmlType)
    {
       if (xmlType == null)
          return null;
       String localPart = xmlType.getLocalPart();
-      return (Class)schemaBasicTypes.get(localPart);
+      return schemaBasicTypes.get(localPart);
    }
 
    /**
@@ -658,7 +611,7 @@ public class WSDLUtils
    public String getMixedCase(String str)
    {
       if (str == null || str.length() == 0)
-         throw new IllegalArgumentException("String passed to WSDLUtils.getMixedCase is null");
+         throw MESSAGES.stringPassedIsNull();
 
       if (str.length() == 1)
          return str.toUpperCase();
@@ -675,7 +628,7 @@ public class WSDLUtils
    public String getFormattedString(QName qn)
    {
       if (qn == null)
-         throw new IllegalArgumentException(" QName passed is null");
+         throw MESSAGES.qNamePassedIsNull();
       StringBuilder sb = new StringBuilder();
       String prefix = qn.getPrefix();
       String localpart = qn.getLocalPart();
@@ -697,7 +650,7 @@ public class WSDLUtils
       QName qn = null;
       int ind = formattedStr.lastIndexOf(':');
       if (ind < 0)
-         throw new IllegalArgumentException("Formatted String is not of format prefix:localpart");
+         throw MESSAGES.formattedStringNotInFormatPrefixLocalPart(formattedStr);
       String prefix = formattedStr.substring(0, ind);
       String nsuri = null;
       if (Constants.PREFIX_XSD.equals(prefix))
@@ -729,7 +682,7 @@ public class WSDLUtils
       return pkgname;
    }
 
-   public static String getTypeNamespace(Class javaType)
+   public static String getTypeNamespace(Class<?> javaType)
    {
       return getTypeNamespace(JavaUtils.getPackageName(javaType));
    }
@@ -787,13 +740,13 @@ public class WSDLUtils
       if (types instanceof XSModelTypes)
          return ((XSModelTypes)types).getSchemaModel();
 
-      throw new WSException("WSDLTypes is not an XSModelTypes");
+      throw MESSAGES.wsdlTypesNotAnXSModelTypes(types);
    }
 
    public static void addSchemaModel(WSDLTypes types, String namespace, JBossXSModel model)
    {
       if (!(types instanceof XSModelTypes))
-         throw new WSException("WSDLTypes is not an XSModelTypes");
+         throw MESSAGES.wsdlTypesNotAnXSModelTypes(types);
 
       XSModelTypes modelTypes = (XSModelTypes)types;
       modelTypes.addSchemaModel(namespace, model);
@@ -805,7 +758,7 @@ public class WSDLUtils
     * @param cls a Class object
     * @return true: A Standard jaxrpc holder
     */
-   public boolean isStandardHolder(Class cls)
+   public boolean isStandardHolder(Class<?> cls)
    {
       if (Holder.class.isAssignableFrom(cls) == false)
          return false; //Not even a holder
@@ -892,7 +845,7 @@ public class WSDLUtils
             return outputs[0];
       }
 
-      throw new WSException("Only Request-Only and Request-Response MEPs are allowed");
+      throw MESSAGES.reqOnlyAndReqResMEPsOnlySupported(operation.getName());
    }
 
    public static WSDLInterfaceOperationInput getWsdl11Input(WSDLInterfaceOperation operation)
@@ -909,6 +862,6 @@ public class WSDLUtils
             return inputs[0];
       }
 
-      throw new WSException("Only Request-Only and Request-Response MEPs are allowed");
+      throw MESSAGES.reqOnlyAndReqResMEPsOnlySupported(operation.getName());
    }
 }

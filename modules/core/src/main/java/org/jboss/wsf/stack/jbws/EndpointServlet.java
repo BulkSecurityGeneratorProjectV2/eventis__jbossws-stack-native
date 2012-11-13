@@ -21,17 +21,19 @@
  */
 package org.jboss.wsf.stack.jbws;
 
+import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 
+import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 import org.jboss.logging.Logger;
 import org.jboss.wsf.spi.deployment.Endpoint;
+import org.jboss.wsf.spi.deployment.ServletDelegate;
 import org.jboss.wsf.spi.management.EndpointResolver;
-import org.jboss.wsf.common.injection.InjectionHelper;
-import org.jboss.wsf.common.injection.PreDestroyHolder;
-import org.jboss.wsf.common.servlet.AbstractEndpointServlet;
-
-import javax.servlet.ServletConfig;
 
 /**
  * A Native endpoint servlet that is installed for every web service endpoint
@@ -39,14 +41,8 @@ import javax.servlet.ServletConfig;
  * @author heiko.braun@jboss.com
  * @author richard.opalka@jboss.com
  */
-public final class EndpointServlet extends AbstractEndpointServlet
+public final class EndpointServlet extends AbstractEndpointServlet implements ServletDelegate
 {
-   
-   // provide logging
-   protected static final Logger log = Logger.getLogger(EndpointServlet.class);
-
-   private List<PreDestroyHolder> preDestroyRegistry = new LinkedList<PreDestroyHolder>();
-   private final Object lock = new Object();
 
    /**
     * Provides Native specific endpoint resolver
@@ -60,58 +56,46 @@ public final class EndpointServlet extends AbstractEndpointServlet
       return new WebAppResolver(contextPath, servletName);
    }
 
-   /**
-    * Post init phase hook using template method
-    * @param servletConfig servlet config
-    */
    @Override
-   protected final void postInit(ServletConfig servletConfig)
+   public void doHead(HttpServletRequest request, HttpServletResponse response, ServletContext context)
+         throws ServletException, IOException
    {
-      ServletConfigHelper.initEndpointConfig(servletConfig, endpoint);
-   }
-   
-   @Override
-   protected final void postService()
-   {
-      registerForPreDestroy(endpoint);
+      this.doHead(request, response);
    }
 
    @Override
-   public final void destroy()
+   public void doGet(HttpServletRequest request, HttpServletResponse response, ServletContext context)
+         throws ServletException, IOException
    {
-      synchronized(this.lock)
-      {
-         for (final PreDestroyHolder holder : this.preDestroyRegistry)
-         {
-            try
-            {
-               final Object targetBean = holder.getObject();
-               InjectionHelper.callPreDestroyMethod(targetBean);
-            }
-            catch (Exception exception)
-            {
-               log.error(exception.getMessage(), exception);
-            }
-         }
-         this.preDestroyRegistry.clear();
-      }
-      super.destroy();
+      this.doGet(request, response);
    }
 
-   private void registerForPreDestroy(Endpoint ep)
+   @Override
+   public void doPost(HttpServletRequest request, HttpServletResponse response, ServletContext context)
+         throws ServletException, IOException
    {
-      PreDestroyHolder holder = (PreDestroyHolder)ep.getAttachment(PreDestroyHolder.class);
-      if (holder != null)
-      {
-         synchronized(this.lock)
-         {
-            if (!this.preDestroyRegistry.contains(holder))
-            {
-               this.preDestroyRegistry.add(holder);
-            }
-         }
-         ep.removeAttachment(PreDestroyHolder.class);
-      }
+      this.doPost(request, response);
+   }
+
+   @Override
+   public void doPut(HttpServletRequest request, HttpServletResponse response, ServletContext context)
+         throws ServletException, IOException
+   {
+      this.doPut(request, response);
+   }
+
+   @Override
+   public void doDelete(HttpServletRequest request, HttpServletResponse response, ServletContext context)
+         throws ServletException, IOException
+   {
+      this.doDelete(request, response);
+   }
+
+   @Override
+   public void service(HttpServletRequest request, HttpServletResponse response, ServletContext context)
+         throws ServletException, IOException
+   {
+      this.service(request, response);
    }
 
 }

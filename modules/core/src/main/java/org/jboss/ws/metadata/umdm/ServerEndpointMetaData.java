@@ -21,18 +21,12 @@
  */
 package org.jboss.ws.metadata.umdm;
 
-import org.jboss.logging.Logger;
-import org.jboss.ws.metadata.config.ConfigurationProvider;
-import org.jboss.wsf.spi.deployment.Endpoint;
-import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedHandlerMetaData.HandlerType;
-import org.jboss.wsf.spi.binding.BindingCustomization;
-
 import javax.management.ObjectName;
 import javax.xml.namespace.QName;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
+import org.jboss.ws.NativeMessages;
+import org.jboss.wsf.spi.deployment.Endpoint;
+import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedHandlerMetaData.HandlerType;
 
 /**
  * Client side endpoint meta data.
@@ -43,8 +37,6 @@ import java.util.List;
  */
 public class ServerEndpointMetaData extends EndpointMetaData
 {
-   protected static final Logger log = Logger.getLogger(ServerEndpointMetaData.class);
-
    public static final String SEPID_DOMAIN = "jboss.ws";
    public static final String SEPID_PROPERTY_CONTEXT = "context";
    public static final String SEPID_PROPERTY_ENDPOINT = "endpoint";
@@ -69,21 +61,10 @@ public class ServerEndpointMetaData extends EndpointMetaData
    // The optional secure wsdl access 
    private boolean secureWSDLAccess;
 
-   public ServerEndpointMetaData(ServiceMetaData service, Endpoint endpoint, QName portName, QName portTypeName, Type type)
+   public ServerEndpointMetaData(ServiceMetaData service, Endpoint endpoint, QName portName, QName portTypeName)
    {
-      super(service, portName, portTypeName, type);
+      super(service, portName, portTypeName);
       this.endpoint = endpoint;
-
-      String configName = ConfigurationProvider.DEFAULT_ENDPOINT_CONFIG_NAME;
-      String configFile;
-      if (type == Type.JAXRPC)
-         configFile = ConfigurationProvider.DEFAULT_JAXRPC_ENDPOINT_CONFIG_FILE;
-      else
-         configFile = ConfigurationProvider.DEFAULT_JAXWS_ENDPOINT_CONFIG_FILE;
-
-      EndpointConfigMetaData ecmd = getEndpointConfigMetaData();
-      ecmd.setConfigName(configName);
-      ecmd.setConfigFile(configFile);
    }
 
    public Endpoint getEndpoint()
@@ -144,7 +125,7 @@ public class ServerEndpointMetaData extends EndpointMetaData
    public void setContextRoot(String contextRoot)
    {
       if (contextRoot != null && !(contextRoot.startsWith("/")))
-         throw new IllegalArgumentException("context root should start with '/'");
+         throw NativeMessages.MESSAGES.contextRootShouldStartsWith(contextRoot);
 
       this.contextRoot = contextRoot;
    }
@@ -157,7 +138,7 @@ public class ServerEndpointMetaData extends EndpointMetaData
    public void setURLPattern(String urlPattern)
    {
       if (urlPattern != null && !urlPattern.startsWith("/"))
-         throw new IllegalArgumentException("URL pattern should start with '/'");
+         throw NativeMessages.MESSAGES.urlPatternShouldStartsWith(urlPattern);
 
       this.urlPattern = urlPattern;
    }
@@ -192,30 +173,14 @@ public class ServerEndpointMetaData extends EndpointMetaData
    public void setEndpointAddress(String endpointAddress)
    {
       if (endpoint == null)
-         throw new IllegalStateException("Endpoint not available");
+         throw NativeMessages.MESSAGES.endpointNotAvailable();
 
       endpoint.setAddress(endpointAddress);
-   }
-
-   /**
-    * Will be set through a deployment aspect
-    * @return List<BindingCustomization> of available customizations
-    */
-   public Collection<BindingCustomization> getBindingCustomizations()
-   {
-      List<BindingCustomization> list = new ArrayList<BindingCustomization>();
-      for (Object att : endpoint.getAttachments())
-      {
-         if (att instanceof BindingCustomization)
-            list.add((BindingCustomization)att);
-      }
-      return list;
    }
 
    public String toString()
    {
       StringBuilder buffer = new StringBuilder("\nServerEndpointMetaData:");
-      buffer.append("\n type=").append(getType());
       buffer.append("\n qname=").append(getPortName());
       buffer.append("\n id=").append(getServiceEndpointID().getCanonicalName());
       buffer.append("\n address=").append(getEndpointAddress());
@@ -223,16 +188,12 @@ public class ServerEndpointMetaData extends EndpointMetaData
       buffer.append("\n linkName=").append(getLinkName());
       buffer.append("\n implName=").append(getServiceEndpointImplName());
       buffer.append("\n seiName=").append(getServiceEndpointInterfaceName());
-      buffer.append("\n serviceMode=").append(getServiceMode());
       buffer.append("\n portComponentName=").append(getPortComponentName());
       buffer.append("\n contextRoot=").append(getContextRoot());
       buffer.append("\n urlPattern=").append(getURLPattern());
-      buffer.append("\n configFile=").append(getConfigFile());
-      buffer.append("\n configName=").append(getConfigName());
       buffer.append("\n authMethod=").append(getAuthMethod());
       buffer.append("\n transportGuarantee=").append(getTransportGuarantee());
       buffer.append("\n secureWSDLAccess=").append(isSecureWSDLAccess());
-      buffer.append("\n properties=").append(getProperties());
 
       for (OperationMetaData opMetaData : getOperations())
       {

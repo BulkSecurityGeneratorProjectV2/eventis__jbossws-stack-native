@@ -26,6 +26,8 @@ import java.util.List;
 
 import javax.xml.namespace.QName;
 
+import org.jboss.ws.NativeMessages;
+
 
 /**
  * Type mapping meta data
@@ -51,9 +53,9 @@ public class TypeMappingMetaData
    public TypeMappingMetaData(TypesMetaData typesMetaData, QName xmlType, String javaTypeName)
    {
       if (xmlType == null)
-         throw new IllegalArgumentException("Invalid null xmlType");
+         throw NativeMessages.MESSAGES.illegalNullArgument("xmlType");
       if (javaTypeName == null)
-         throw new IllegalArgumentException("Invalid null javaTypeName");
+         throw NativeMessages.MESSAGES.illegalNullArgument("javaTypeName");
       
       this.typesMetaData = typesMetaData;
       this.javaTypeName = javaTypeName;
@@ -84,7 +86,7 @@ public class TypeMappingMetaData
    public void setQNameScope(String qnameScope)
    {
       if (allowedScopes.contains(qnameScope) == false)
-         throw new IllegalArgumentException("Invalid qname scope: " + qnameScope);
+         throw NativeMessages.MESSAGES.invalidQNameScope(qnameScope);
       
       this.qnameScope = qnameScope;
    }

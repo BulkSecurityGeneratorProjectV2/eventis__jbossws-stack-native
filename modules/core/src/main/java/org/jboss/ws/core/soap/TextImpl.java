@@ -35,7 +35,6 @@ import org.w3c.dom.Text;
  */
 public class TextImpl extends NodeImpl implements javax.xml.soap.Text
 {
-
    public TextImpl(org.w3c.dom.Node node)
    {
       super(node);

@@ -21,9 +21,8 @@
  */
 package org.jboss.ws.core.client;
 
-import org.jboss.ws.feature.FastInfosetFeature;
-import org.jboss.ws.feature.JsonEncodingFeature;
-import org.jboss.wsf.spi.util.ServiceLoader;
+import org.jboss.ws.NativeMessages;
+import org.jboss.ws.api.util.ServiceLoader;
 
 /**
  * A factory for remote connections 
@@ -37,30 +36,19 @@ public class RemoteConnectionFactory
    {
       String targetAddress = epInfo.getTargetAddress();
       if (targetAddress == null)
-         throw new IllegalArgumentException("Cannot obtain target address from: " + epInfo);
+         throw NativeMessages.MESSAGES.cannotObtainTargetAddressFrom(epInfo);
       
       String key = null;
       targetAddress = targetAddress.toLowerCase();
       if (targetAddress.startsWith("http"))
          key = RemoteConnection.class.getName() + ".http";
-      else if (targetAddress.startsWith("jms"))
-         key = RemoteConnection.class.getName() + ".jms";
       
       if (key == null)
-         throw new IllegalArgumentException("Cannot obtain remote connetion for: " + targetAddress);
+         throw NativeMessages.MESSAGES.cannotObtainRemoteConnectionFor(targetAddress);
       
-      if (epInfo.isFeatureEnabled(FastInfosetFeature.class))
-      {
-         key += ".fastinfoset";
-      }
-      else if (epInfo.isFeatureEnabled(JsonEncodingFeature.class))
-      {
-         key += ".json";
-      }
-      
-      RemoteConnection con = (RemoteConnection)ServiceLoader.loadService(key, null);
+      RemoteConnection con = (RemoteConnection)ServiceLoader.loadService(key, null, this.getClass().getClassLoader());
       if (con == null)
-         throw new IllegalArgumentException("Cannot obtain remote connetion for: " + key);
+         throw NativeMessages.MESSAGES.cannotObtainRemoteConnectionFor(key);
       
       return con;
    }

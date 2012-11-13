@@ -27,7 +27,8 @@ import javax.xml.namespace.QName;
 import javax.xml.transform.Source;
 
 import org.jboss.logging.Logger;
-import org.jboss.ws.Constants;
+import org.jboss.ws.NativeMessages;
+import org.jboss.ws.common.Constants;
 import org.jboss.ws.core.binding.BindingException;
 import org.jboss.ws.core.binding.DeserializerSupport;
 import org.jboss.ws.core.binding.SerializationContext;
@@ -65,7 +66,7 @@ public class CalendarDeserializer extends DeserializerSupport
             value = SimpleTypeBindings.unmarshalTime(valueStr);
          else if (Constants.TYPE_LITERAL_DATETIME.equals(xmlType))
             value = SimpleTypeBindings.unmarshalDateTime(valueStr);
-         else throw new IllegalArgumentException("Invalid xmlType: " + xmlType);
+         else throw NativeMessages.MESSAGES.invalidXmlType(xmlType);
       }
 
       return value;

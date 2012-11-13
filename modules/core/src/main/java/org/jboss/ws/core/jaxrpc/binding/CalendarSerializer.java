@@ -27,7 +27,8 @@ import javax.xml.namespace.QName;
 import javax.xml.transform.Result;
 
 import org.jboss.logging.Logger;
-import org.jboss.ws.Constants;
+import org.jboss.ws.NativeMessages;
+import org.jboss.ws.common.Constants;
 import org.jboss.ws.core.binding.BindingException;
 import org.jboss.ws.core.binding.SerializationContext;
 import org.jboss.ws.core.binding.SerializerSupport;
@@ -59,7 +60,7 @@ public class CalendarSerializer extends SerializerSupport
       else if (Constants.TYPE_LITERAL_DATETIME.equals(xmlType))
          valueStr = SimpleTypeBindings.marshalDateTime((Calendar)value);
       else
-         throw new IllegalArgumentException("Invalid xmlType: " + xmlType);
+         throw NativeMessages.MESSAGES.invalidXmlType(xmlType);
 
       NamespaceRegistry nsRegistry = serContext.getNamespaceRegistry();
       String xmlFragment = wrapValueStr(xmlName, valueStr, nsRegistry, null, attributes, true);

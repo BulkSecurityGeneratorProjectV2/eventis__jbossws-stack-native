@@ -24,8 +24,7 @@ package org.jboss.ws.core.jaxrpc.binding.jbossxb;
 import java.io.InputStream;
 import java.util.HashMap;
 
-import org.jboss.ws.WSException;
-import org.jboss.ws.extensions.xop.jaxrpc.XOPUnmarshallerImpl;
+import org.jboss.ws.NativeMessages;
 import org.jboss.xb.binding.JBossXBException;
 import org.jboss.xb.binding.UnmarshallerFactory;
 import org.jboss.xb.binding.sunday.unmarshalling.SchemaBinding;
@@ -51,8 +50,6 @@ public class JBossXBUnmarshallerImpl implements JBossXBUnmarshaller
 
       org.jboss.xb.binding.Unmarshaller unm = UnmarshallerFactory.newInstance().newUnmarshaller();
       SchemaBinding schemaBinding = JBossXBSupport.getOrCreateSchemaBinding(properties);
-      XOPUnmarshallerImpl xopUnmarshaller = new XOPUnmarshallerImpl();
-      schemaBinding.setXopUnmarshaller(xopUnmarshaller);
 
       try
       {
@@ -70,7 +67,7 @@ public class JBossXBUnmarshallerImpl implements JBossXBUnmarshaller
    public Object getProperty(String name)
    {
       if (name == null)
-         throw new IllegalArgumentException("name parameter is null");
+         throw NativeMessages.MESSAGES.illegalNullArgument("name");
 
       return properties.get(name);
    }
@@ -81,7 +78,7 @@ public class JBossXBUnmarshallerImpl implements JBossXBUnmarshaller
    public void setProperty(String name, Object value)
    {
       if (name == null)
-         throw new IllegalArgumentException("name parameter is null");
+         throw NativeMessages.MESSAGES.illegalNullArgument("name");
 
       properties.put(name, value);
    }
@@ -93,12 +90,12 @@ public class JBossXBUnmarshallerImpl implements JBossXBUnmarshaller
    {
       if (getProperty(JBossXBConstants.JBXB_XS_MODEL) == null)
       {
-         throw new WSException("Cannot find required property: " + JBossXBConstants.JBXB_XS_MODEL);
+         throw NativeMessages.MESSAGES.cannotFindRequiredProperty(JBossXBConstants.JBXB_XS_MODEL);
       }
 
       if (getProperty(JBossXBConstants.JBXB_JAVA_MAPPING) == null)
       {
-         throw new WSException("Cannot find required property: " + JBossXBConstants.JBXB_JAVA_MAPPING);
+         throw NativeMessages.MESSAGES.cannotFindRequiredProperty(JBossXBConstants.JBXB_JAVA_MAPPING);
       }
    }
 }

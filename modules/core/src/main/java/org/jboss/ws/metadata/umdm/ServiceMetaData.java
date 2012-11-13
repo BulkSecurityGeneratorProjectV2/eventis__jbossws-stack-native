@@ -22,10 +22,10 @@
 package org.jboss.ws.metadata.umdm;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,22 +34,21 @@ import java.util.Properties;
 import javax.xml.namespace.QName;
 import javax.xml.rpc.encoding.TypeMappingRegistry;
 
-import org.jboss.logging.Logger;
+import org.jboss.ws.NativeLoggers;
+import org.jboss.ws.NativeMessages;
 import org.jboss.ws.WSException;
 import org.jboss.ws.core.binding.TypeMappingImpl;
 import org.jboss.ws.core.jaxrpc.TypeMappingRegistryImpl;
 import org.jboss.ws.core.jaxrpc.binding.jbossxb.SchemaBindingBuilder;
-import org.jboss.ws.core.soap.Use;
+import org.jboss.ws.core.soap.utils.Use;
 import org.jboss.ws.metadata.jaxrpcmapping.JavaWsdlMapping;
 import org.jboss.ws.metadata.jaxrpcmapping.JavaWsdlMappingFactory;
 import org.jboss.ws.metadata.wsdl.WSDLDefinitions;
 import org.jboss.ws.metadata.wsdl.WSDLTypes;
 import org.jboss.ws.metadata.wsdl.WSDLUtils;
 import org.jboss.ws.metadata.wsdl.xmlschema.JBossXSModel;
-import org.jboss.ws.metadata.wsse.WSSecurityConfiguration;
 import org.jboss.ws.tools.wsdl.WSDLDefinitionsFactory;
 import org.jboss.wsf.spi.deployment.UnifiedVirtualFile;
-import org.jboss.wsf.spi.metadata.j2ee.serviceref.UnifiedHandlerMetaData.HandlerType;
 import org.jboss.xb.binding.sunday.unmarshalling.SchemaBinding;
 
 /**
@@ -58,11 +57,8 @@ import org.jboss.xb.binding.sunday.unmarshalling.SchemaBinding;
  * @author Thomas.Diesler@jboss.org
  * @since 12-May-2005
  */
-public class ServiceMetaData implements InitalizableMetaData
+public class ServiceMetaData implements InitalizableMetaData, Serializable
 {
-   // provide logging
-   private static final Logger log = Logger.getLogger(ServiceMetaData.class);
-
    // The parent meta data.
    private UnifiedMetaData wsMetaData;
 
@@ -76,9 +72,6 @@ public class ServiceMetaData implements InitalizableMetaData
    private String wsdlFile;
    private URL mappingLocation;
    private String wsdlPublishLocation;
-   
-   // The optional service handlers
-   private List<HandlerMetaDataJAXWS> handlers = new ArrayList<HandlerMetaDataJAXWS>();
 
    // The type mapping that is maintained by this service
    private TypesMetaData types;
@@ -90,9 +83,6 @@ public class ServiceMetaData implements InitalizableMetaData
    
    // derived cached encoding style
    private Use encStyle;
-   
-   // The security configuration
-   private WSSecurityConfiguration securityConfig;
    
    // The key to the wsdl cache
    private String wsdlCacheKey;
@@ -184,16 +174,6 @@ public class ServiceMetaData implements InitalizableMetaData
       return types;
    }
 
-   public void addHandler(HandlerMetaDataJAXWS handler)
-   {
-      handlers.add(handler);
-   }
-   
-   public List<HandlerMetaDataJAXWS> getHandlerMetaData()
-   {
-      return Collections.unmodifiableList(handlers);
-   }
-
    public List<EndpointMetaData> getEndpoints()
    {
       return new ArrayList<EndpointMetaData>(endpoints.values());
@@ -219,7 +199,7 @@ public class ServiceMetaData implements InitalizableMetaData
             if (epMetaData != null)
             {
                // The CTS uses Service.getPort(Class) with multiple endpoints implementing the same SEI
-               log.warn("Multiple possible endpoints implementing SEI: " + seiName);
+               NativeLoggers.ROOT_LOGGER.multiplePossibleEndpointImplementingSEI(seiName);
             }
             epMetaData = epmd;
          }
@@ -234,7 +214,7 @@ public class ServiceMetaData implements InitalizableMetaData
       // This happends when we have multiple port components in sharing the same wsdl port
       // The EndpointMetaData name is the wsdl port, so we cannot have multiple meta data for the same port.
       if (endpoints.get(portName) != null)
-         throw new WSException("EndpointMetaData name must be unique: " + portName);
+         throw NativeMessages.MESSAGES.endpointMetadataMustBeUnique(portName);
 
       endpoints.put(portName, epMetaData);
    }
@@ -265,7 +245,7 @@ public class ServiceMetaData implements InitalizableMetaData
             }
             catch (IOException e)
             {
-               throw new WSException("Cannot parse jaxrpc-mapping.xml", e);
+               throw new WSException(e);
             }
          }
       }
@@ -322,7 +302,7 @@ public class ServiceMetaData implements InitalizableMetaData
             }
             catch (IOException ex)
             {
-               throw new IllegalStateException("Cannot find wsdl: " + wsdlFile);
+               throw new IllegalStateException(ex);
             }
          }
       }
@@ -334,19 +314,9 @@ public class ServiceMetaData implements InitalizableMetaData
       Use encStyle = getEncodingStyle();
       TypeMappingImpl typeMapping = (TypeMappingImpl)tmRegistry.getTypeMapping(encStyle.toURI());
       if (typeMapping == null)
-         throw new WSException("No type mapping for encoding style: " + encStyle);
+         throw NativeMessages.MESSAGES.noTypeMapping(encStyle);
 
       return typeMapping;
-   }
-
-   public WSSecurityConfiguration getSecurityConfiguration()
-   {
-      return securityConfig;
-   }
-
-   public void setSecurityConfiguration(WSSecurityConfiguration securityConfiguration)
-   {
-      this.securityConfig = securityConfiguration;
    }
 
    public Use getEncodingStyle()
@@ -363,7 +333,7 @@ public class ServiceMetaData implements InitalizableMetaData
                }
                else if (encStyle.equals(epMetaData.getEncodingStyle()) == false)
                {
-                  throw new WSException("Conflicting encoding styles not supported");
+                  throw NativeMessages.MESSAGES.conflictingEncodingStyles(encStyle, epMetaData.getEncodingStyle());
                }
             }
          }
@@ -389,19 +359,6 @@ public class ServiceMetaData implements InitalizableMetaData
 
    public void validate()
    {
-      // Validate that there is at least one handler configured
-      // if we have a security configuration
-      if (securityConfig != null)
-      {
-         int handlerCount = 0;
-         for (EndpointMetaData epMetaData : endpoints.values())
-         {
-            handlerCount += epMetaData.getHandlerMetaData(HandlerType.ALL).size();
-         }
-         if (handlerCount == 0)
-            log.warn("WS-Security requires a security handler to be configured");
-      }
-
       // Validate endpoints
       for (EndpointMetaData epMetaData : endpoints.values())
          epMetaData.validate();
@@ -440,7 +397,7 @@ public class ServiceMetaData implements InitalizableMetaData
    public void assertTargetNamespace(String targetNS)
    {
       if (getServiceName().getNamespaceURI().equals(targetNS) == false)
-         throw new WSException("Requested namespace is not WSDL target namespace: " + targetNS);
+         throw NativeMessages.MESSAGES.notWsdlTargetNamespace(targetNS);
    }
 
    public String toString()
@@ -453,7 +410,6 @@ public class ServiceMetaData implements InitalizableMetaData
       buffer.append("\n wsdlLocation=" + wsdlLocation);
       buffer.append("\n jaxrpcMapping=" + mappingLocation);
       buffer.append("\n publishLocation=" + wsdlPublishLocation);
-      buffer.append("\n securityConfig=" + (securityConfig != null ? "found" : null));
       buffer.append("\n properties=" + properties);
       buffer.append("\n" + types);
       buffer.append("\n");

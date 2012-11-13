@@ -21,6 +21,8 @@
 */
 package org.jboss.ws.core.client.ssl;
 
+import static org.jboss.ws.NativeMessages.MESSAGES;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -45,7 +47,7 @@ import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509KeyManager;
 import javax.net.ssl.X509TrustManager;
 
-import org.jboss.logging.Logger;
+import org.jboss.ws.NativeLoggers;
 import org.jboss.ws.core.StubExt;
 
 /**
@@ -162,9 +164,7 @@ public class SSLContextFactory
    private Boolean socketUseClientMode = null;
    private Boolean serverSocketUseClientMode = null;
    private Boolean serverAuthMode = null;
-
-   private static final Logger log = Logger.getLogger(SSLContextFactory.class);
-
+   
    /**
     * Constructor for {@link SSLContextFactory} that does not have
     * any configuration so it falls back to all defaults.
@@ -236,7 +236,7 @@ public class SSLContextFactory
       }
       else
       {
-         throw new IllegalArgumentException("Can not set remoting socket factory with null protocol");
+         throw MESSAGES.cannotSetRemotingSocketFactory();
       }
    }
 
@@ -844,9 +844,7 @@ public class SSLContextFactory
       }
       catch(Exception e)
       {
-         IOException ioe = new IOException("Error creating server socket factory SSL context: " + e.getMessage());
-         ioe.setStackTrace(e.getStackTrace());
-         throw ioe;
+         throw MESSAGES.errorCreatingServerSocketFactorySSLContext(e);
       }
 
       return;
@@ -883,9 +881,7 @@ public class SSLContextFactory
       }
       catch(Exception e)
       {
-         IOException ioe = new IOException("Error creating socket factory SSL context: " + e.getMessage());
-         ioe.setStackTrace(e.getStackTrace());
-         throw ioe;
+         throw MESSAGES.errorCreatingSocketFactorySSLContext(e);
       }
 
       return;
@@ -919,14 +915,12 @@ public class SSLContextFactory
             if (isServerSocketUseClientMode())
             {
                keyManagers = null;
-               log.debugf("Could not find keytore url. %s", e.getMessage());
+               NativeLoggers.CLIENT_LOGGER.couldNotFindKeystore(e);
             }
             else
             {
                // because this ssl context will create server socket factories, will throw if can not find keystore
-               IOException ioe = new IOException("Can not find keystore url.");
-               ioe.initCause(e);
-               throw ioe;
+               throw MESSAGES.cannotFindKeystoreUrl(e);
             }
          }
 
@@ -938,7 +932,7 @@ public class SSLContextFactory
          catch (NullStoreURLException e)
          {
             trustManagers = null;
-            log.debugf("Could not find truststore url.  %s", e.getMessage());
+            NativeLoggers.CLIENT_LOGGER.couldNotFindTruststore(e);
          }
 
          secureRandom = getSecureRandom();
@@ -947,9 +941,7 @@ public class SSLContextFactory
       }
       catch(Exception e)
       {
-         IOException ioe = new IOException("Error initializing server socket factory SSL context: " + e.getMessage());
-         ioe.setStackTrace(e.getStackTrace());
-         throw ioe;
+         throw MESSAGES.errorInitializingServerSocketFactorySSLContext(e);
       }
 
       return;
@@ -982,7 +974,7 @@ public class SSLContextFactory
          {
             // this is allowable since would be the normal scenario
             keyManagers = null;
-            log.debugf("Could not find keystore url. %s ", e.getMessage());
+            NativeLoggers.CLIENT_LOGGER.couldNotFindKeystore(e);
          }
 
          try
@@ -998,13 +990,11 @@ public class SSLContextFactory
             if(keyManagers != null)
             {
                trustManagers = null;
-               log.debugf("Could not find truststore url. %s", e.getMessage());
+               NativeLoggers.CLIENT_LOGGER.couldNotFindTruststore(e);
             }
             else
             {
-               IOException ioe = new IOException("Can not find truststore url.");
-               ioe.initCause(e);
-               throw ioe;
+               throw MESSAGES.cannotFindTruststoreUrl(e);
             }
          }
 
@@ -1014,9 +1004,7 @@ public class SSLContextFactory
       }
       catch(Exception e)
       {
-         IOException ioe = new IOException("Error initializing socket factory SSL context: " + e.getMessage());
-         ioe.setStackTrace(e.getStackTrace());
-         throw ioe;
+         throw MESSAGES.errorInitializingSocketFactorySSLContext(e);
       }
 
       return;
@@ -1117,7 +1105,7 @@ public class SSLContextFactory
             if(!containsAlias)
             {
                // can not continue as supplied alias does not exist as key entry
-               throw new IOException("Can not find key entry for key store (" + ksPathURL + ") with given alias (" + alias + ")");
+               throw MESSAGES.cannotFindKeyEntry(ksPathURL, alias);
             }
          }
 
@@ -1198,7 +1186,7 @@ public class SSLContextFactory
 
       if ( storePathURL == null )
       {
-         throw new NullStoreURLException("Can not find store file for url because store url is null.");
+         throw new NullStoreURLException(MESSAGES.nullStoreURL());
       }
 
       // now that keystore instance created, need to load data from file
@@ -1262,7 +1250,7 @@ public class SSLContextFactory
 
          if(tst.exists() == true)
          {
-            url = tst.toURL();
+            url = tst.toURI().toURL();
          }
          else
          {

@@ -24,22 +24,22 @@ package org.jboss.ws.core.soap;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.Iterator;
+import java.util.ResourceBundle;
 
 import javax.xml.namespace.QName;
 import javax.xml.soap.Name;
 import javax.xml.soap.SOAPElement;
 import javax.xml.soap.SOAPException;
-import javax.xml.transform.Source;
-import javax.xml.ws.handler.MessageContext.Scope;
 
 import org.jboss.logging.Logger;
-import org.jboss.ws.Constants;
+import org.jboss.ws.core.soap.BundleUtils;
+import org.jboss.ws.common.Constants;
+import org.jboss.ws.common.DOMWriter;
 import org.jboss.ws.core.CommonMessageContext;
-import org.jboss.ws.core.jaxws.handler.MessageContextJAXWS;
 import org.jboss.ws.core.soap.SOAPContent.State;
-import org.jboss.ws.extensions.xop.XOPContext;
+import org.jboss.ws.core.soap.utils.MessageContextAssociation;
+import org.jboss.ws.core.soap.utils.XMLFragment;
 import org.jboss.ws.metadata.umdm.ParameterMetaData;
-import org.jboss.wsf.common.DOMWriter;
 import org.w3c.dom.Attr;
 import org.w3c.dom.DOMException;
 import org.w3c.dom.NamedNodeMap;
@@ -70,6 +70,7 @@ import org.w3c.dom.TypeInfo;
  */
 public class SOAPContentElement extends SOAPElementImpl implements SOAPContentAccess
 {
+   private static final ResourceBundle bundle = BundleUtils.getBundle(SOAPContentElement.class);
    // provide logging
    private static Logger log = Logger.getLogger(SOAPContentElement.class);
 
@@ -108,7 +109,7 @@ public class SOAPContentElement extends SOAPElementImpl implements SOAPContentAc
    public ParameterMetaData getParamMetaData()
    {
       if (paramMetaData == null)
-         throw new IllegalStateException("Parameter meta data not available");
+         throw new IllegalStateException(BundleUtils.getMessage(bundle, "PARAMETER_META_DATA_NOT_AVAILABLE"));
 
       return paramMetaData;
    }
@@ -150,14 +151,6 @@ public class SOAPContentElement extends SOAPElementImpl implements SOAPContentAc
 
    /** Get the payload as source.
     */
-   public Source getPayload()
-   {
-      if (soapContent.getState() == State.OBJECT_VALID)
-         transitionTo(State.DOM_VALID);
-
-      return soapContent.getPayload();
-   }
-
    public XMLFragment getXMLFragment()
    {
       transitionTo(State.XML_VALID);
@@ -585,62 +578,6 @@ public class SOAPContentElement extends SOAPElementImpl implements SOAPContentAc
          soapContent.getXMLFragment().writeTo(writer);
 
       }
-   }
-
-   /**
-    * When a SOAPContentElement transitions between dom-valid and xml-valid
-    * the XOP elements need to transition from XOP optimized to base64 and reverse.<p>
-    *
-    * If MTOM is disabled through a message context property we always enforce the
-    * base64 representation by expanding to DOM, the same happens when a JAXRPC handler
-    * accesses the SOAPContentElement.<p>
-    *
-    * If the element is in dom-valid state (because a handlers accessed it), upon marshalling
-    * it's needs to be decided wether or not the <code>xop:Include</code> should be restored.
-    * This as well depends upon the message context property.
-    */
-   public void handleMTOMTransitions()
-   {
-      // JMS transport hot fix. Can be removed once we got a immutabe object model
-      if (MessageContextAssociation.peekMessageContext() == null)
-         return;
-      
-      // MTOM processing is only required on XOP parameters
-      if (!isXOPParameter())
-         return;
-
-      boolean domContentState = (soapContent instanceof DOMContent);
-
-      if (!XOPContext.isMTOMEnabled())
-      {
-         // If MTOM is disabled, we force dom expansion on XOP parameters.
-         // This will inline any XOP include element and remove the attachment part.
-         // See SOAPFactoryImpl for details.
-
-         log.debug("MTOM disabled: Force inline XOP data");
-
-         // TODO: This property must be reset, otherwise you negate its purpose
-         CommonMessageContext msgContext = MessageContextAssociation.peekMessageContext();
-         msgContext.put(CommonMessageContext.ALLOW_EXPAND_TO_DOM, Boolean.TRUE);
-         if (msgContext instanceof MessageContextJAXWS)
-            ((MessageContextJAXWS)msgContext).setScope(CommonMessageContext.ALLOW_EXPAND_TO_DOM, Scope.APPLICATION);
-
-         expandToDOM();
-      }
-      else if (domContentState && XOPContext.isMTOMEnabled())
-      {
-         // When the DOM representation is valid,
-         // but MTOM is enabled we need to convert the inlined
-         // element back to an xop:Include element and create the attachment part
-
-         log.debug("MTOM enabled: Restore XOP data");
-         XOPContext.restoreXOPDataDOM(this);
-      }
-   }
-
-   boolean isXOPParameter()
-   {
-      return paramMetaData != null && paramMetaData.isXOP();
    }
 
    public void accept(SAAJVisitor visitor)

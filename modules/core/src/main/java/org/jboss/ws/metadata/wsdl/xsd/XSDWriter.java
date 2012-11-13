@@ -31,6 +31,7 @@ import java.net.URL;
 
 import org.apache.xerces.xs.XSModel;
 import org.jboss.logging.Logger;
+import org.jboss.ws.NativeMessages;
 import org.jboss.ws.metadata.wsdl.WSDLDefinitions;
 import org.jboss.ws.metadata.wsdl.xmlschema.JBossXSModel;
 import org.jboss.ws.metadata.wsdl.xmlschema.WSSchemaUtils;
@@ -53,7 +54,7 @@ public class XSDWriter
    public void writeXSD(Writer writer, XSModel xsmodel, WSDLDefinitions wsdl)
    {
       if (xsmodel == null)
-         throw new IllegalArgumentException("xsmodel is NULL");
+         throw NativeMessages.MESSAGES.illegalNullArgument("xsmodel");
       
       this.wsdl = wsdl;
       
@@ -71,7 +72,7 @@ public class XSDWriter
    throws IOException
    {
       if(ns == null)
-         throw new IllegalArgumentException("Illegal Null Argument:ns");
+         throw NativeMessages.MESSAGES.illegalNullArgument("ns");
       String xsdString = "";
       if(xsmodel instanceof JBossXSModel)
       {

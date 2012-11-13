@@ -21,6 +21,8 @@
  */
 package org.jboss.ws.metadata.wsdl.xsd;
 
+import static org.jboss.ws.NativeMessages.MESSAGES;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -48,18 +50,17 @@ import org.apache.xerces.xs.XSParticle;
 import org.apache.xerces.xs.XSSimpleTypeDefinition;
 import org.apache.xerces.xs.XSTerm;
 import org.apache.xerces.xs.XSTypeDefinition;
-import org.jboss.ws.Constants;
-import org.jboss.ws.WSException;
+import org.jboss.ws.common.Constants;
 import org.jboss.ws.metadata.wsdl.xmlschema.JBossXSComplexTypeDefinition;
 import org.jboss.ws.metadata.wsdl.xmlschema.JBossXSElementDeclaration;
 import org.jboss.ws.metadata.wsdl.xmlschema.JBossXSErrorHandler;
 import org.jboss.ws.metadata.wsdl.xmlschema.JBossXSSimpleTypeDefinition;
 import org.jboss.ws.metadata.wsdl.xmlschema.JBossXSStringList;
 import org.jboss.ws.metadata.wsdl.xmlschema.JBossXSTypeDefinition;
-import org.jboss.wsf.spi.management.ServerConfig;
-import org.jboss.wsf.spi.management.ServerConfigFactory;
 import org.jboss.wsf.spi.SPIProvider;
 import org.jboss.wsf.spi.SPIProviderResolver;
+import org.jboss.wsf.spi.management.ServerConfig;
+import org.jboss.wsf.spi.management.ServerConfigFactory;
 
 /**
  *  Util class that deals with XML Schema
@@ -72,7 +73,7 @@ public class SchemaUtils
 
    protected static final String xsNS = Constants.NS_SCHEMA_XSD;
 
-   private static Map<Class, QName> toolsTypeMappingOverride = new HashMap<Class, QName>();
+   private static Map<Class<?>, QName> toolsTypeMappingOverride = new HashMap<Class<?>, QName>();
 
    static
    {
@@ -144,7 +145,7 @@ public class SchemaUtils
    public static QName handleSimpleType(XSSimpleTypeDefinition simple)
    {
       if (simple == null)
-         throw new IllegalArgumentException("XSSimpleTypeDefinition passed is null");
+         throw MESSAGES.illegalNullArgument("XSSimpleTypeDefinition");
 
       //Check if the type of SimpleType is a plain xsd type
       if (Constants.NS_SCHEMA_XSD.equals(simple.getNamespace()))
@@ -158,9 +159,9 @@ public class SchemaUtils
             XSObjectList list = simple.getMemberTypes();
             if (list.getLength() > 0)
                return handleSimpleType((XSSimpleTypeDefinition)list.item(0));
-            throw new WSException("Empty union type not expected");
+            throw MESSAGES.emptyUnionTypeNotExpected();
          case XSSimpleTypeDefinition.VARIETY_ABSENT:
-            throw new WSException("Absent variety is not supported in simple types");
+            throw MESSAGES.absentVariety();
       }
 
       XSTypeDefinition base = simple.getBaseType();
@@ -168,7 +169,7 @@ public class SchemaUtils
          base = base.getBaseType();
 
       if (!(base instanceof XSSimpleTypeDefinition))
-         throw new WSException("Expected base type to be a simple type");
+         throw MESSAGES.baseTypeNotSimple();
 
       return new QName(base.getNamespace(), base.getName());
    }
@@ -236,16 +237,16 @@ public class SchemaUtils
    public boolean hasGlobalElement(QName xmlName, XSModel xsmodel)
    {
       if (xmlName == null)
-         throw new IllegalArgumentException("xmlName is null");
+         throw MESSAGES.illegalNullArgument("xmlName");
       if (xsmodel == null)
-         throw new IllegalArgumentException("XSModel is null");
+         throw MESSAGES.illegalNullArgument("xsmodel");
       boolean bool = false;
       String name = xmlName.getLocalPart();
       if (name == null)
-         throw new IllegalArgumentException("xmlName has a null name");
+         throw MESSAGES.xmlNameHasNull("name");
       String ns = xmlName.getNamespaceURI();
       if (ns == null)
-         throw new IllegalArgumentException("xmlName has a null namespace");
+         throw MESSAGES.xmlNameHasNull("namespace");
       if (xsmodel.getElementDeclaration(name, ns) != null)
          bool = true;
       return bool;
@@ -260,7 +261,7 @@ public class SchemaUtils
    public boolean hasComplexTypeDefinition(QName xmlType, URL xsdLocation)
    {
       if (xsdLocation == null)
-         throw new IllegalArgumentException("xsdLocation is null");
+         throw MESSAGES.illegalNullArgument("xsdLocation");
       XSModel xsmodel = parseSchema(xsdLocation);
       return this.hasComplexTypeDefinition(xmlType, xsmodel);
    }
@@ -274,17 +275,17 @@ public class SchemaUtils
    public boolean hasGlobalElement(QName xmlName, URL xsdLocation)
    {
       if (xmlName == null)
-         throw new IllegalArgumentException("xmlName is null");
+         throw MESSAGES.illegalNullArgument("xmlName");
       if (xsdLocation == null)
-         throw new IllegalArgumentException("xsdLocation is null");
+         throw MESSAGES.illegalNullArgument("xsdLocation");
       XSModel xsmodel = parseSchema(xsdLocation);
       boolean bool = false;
       String name = xmlName.getLocalPart();
       if (name == null)
-         throw new IllegalArgumentException("xmlName has a null name");
+         throw MESSAGES.xmlNameHasNull("name");
       String ns = xmlName.getNamespaceURI();
       if (ns == null)
-         throw new IllegalArgumentException("xmlName has a null namespace");
+         throw MESSAGES.xmlNameHasNull("namespace");
       if (xsmodel.getElementDeclaration(name, ns) != null)
          bool = true;
       return bool;
@@ -299,16 +300,16 @@ public class SchemaUtils
    public boolean hasComplexTypeDefinition(QName xmlType, XSModel xsmodel)
    {
       if (xmlType == null)
-         throw new IllegalArgumentException("xmlType is null");
+         throw MESSAGES.illegalNullArgument("xmlType");
       if (xsmodel == null)
-         throw new IllegalArgumentException("XSModel is null");
+         throw MESSAGES.illegalNullArgument("xsdmodel");
       boolean bool = false;
       String name = xmlType.getLocalPart();
       if (name == null)
-         throw new IllegalArgumentException("xmlName has a null name");
+         throw MESSAGES.xmlNameHasNull("name");
       String ns = xmlType.getNamespaceURI();
       if (ns == null)
-         throw new IllegalArgumentException("xmlName has a null namespace");
+         throw MESSAGES.xmlNameHasNull("namespace");
       if (xsmodel.getTypeDefinition(name, ns) != null)
          bool = true;
       return bool;
@@ -424,7 +425,7 @@ public class SchemaUtils
       XSLoader xsloader = getXSLoader();
       XSModel xsModel = xsloader.loadURI(schemaLoc);
       if (xsModel == null)
-         throw new WSException("Cannot parse schema: " + schemaLoc);
+         throw MESSAGES.cannotParseSchema(schemaLoc);
       return xsModel;
    }
 
@@ -453,7 +454,7 @@ public class SchemaUtils
          return true;
       String targetNS = getTargetNamespace(xsmodel);
       if (targetNS == null)
-         throw new WSException("Target Namespace of xsmodel is null");
+         throw MESSAGES.nullTargetNsXSModel();
       XSNamedMap tmap = xsmodel.getComponentsByNamespace(XSConstants.TYPE_DEFINITION, targetNS);
       XSNamedMap emap = xsmodel.getComponentsByNamespace(XSConstants.ELEMENT_DECLARATION, targetNS);
 
@@ -476,7 +477,7 @@ public class SchemaUtils
       if (xsmodel == null)
          return true;
       if (namespace == null)
-         throw new WSException("Target Namespace of xsmodel is null");
+         throw MESSAGES.nullTargetNsXSModel();
       XSNamedMap tmap = xsmodel.getComponentsByNamespace(XSConstants.TYPE_DEFINITION, namespace);
       XSNamedMap emap = xsmodel.getComponentsByNamespace(XSConstants.ELEMENT_DECLARATION, namespace);
 
@@ -511,7 +512,7 @@ public class SchemaUtils
    public static File getSchemaTempFile(String targetNS) throws IOException
    {
       if (targetNS.length() == 0)
-         throw new IllegalArgumentException("Invalid null target namespace");
+         throw MESSAGES.illegalNullArgument("target namespace");
 
       String fname = targetNS;
       if (fname.indexOf("://") > 0)
@@ -521,7 +522,7 @@ public class SchemaUtils
       try
       {
          SPIProvider spiProvider = SPIProviderResolver.getInstance().getProvider();
-         ServerConfig serverConfig = spiProvider.getSPI(ServerConfigFactory.class).getServerConfig();File tmpDir = serverConfig.getServerTempDir();
+         ServerConfig serverConfig = spiProvider.getSPI(ServerConfigFactory.class).getServerConfig();
          tmpdir = serverConfig.getServerTempDir();
          tmpdir = new File(tmpdir.getCanonicalPath() + "/jbossws");
          tmpdir.mkdirs();
@@ -546,7 +547,7 @@ public class SchemaUtils
    public static String getTargetNamespace(XSModel xsmodel)
    {
       if (xsmodel == null)
-         throw new IllegalArgumentException("Illegal Null Argument: xsmodel");
+         throw MESSAGES.illegalNullArgument("xsmodel");
       String targetNS = null;
       StringList slist = xsmodel.getNamespaces();
       int len = slist != null ? slist.getLength() : 0;

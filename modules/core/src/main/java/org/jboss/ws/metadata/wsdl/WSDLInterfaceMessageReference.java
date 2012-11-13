@@ -27,8 +27,8 @@ import java.util.LinkedHashMap;
 import javax.xml.namespace.QName;
 
 import org.jboss.logging.Logger;
-import org.jboss.ws.Constants;
-import org.jboss.ws.WSException;
+import org.jboss.ws.NativeMessages;
+import org.jboss.ws.common.Constants;
 
 /**
  * A Message Reference component associates a defined type with a message
@@ -84,7 +84,8 @@ public abstract class WSDLInterfaceMessageReference extends Extendable implement
 
    public WSDLInterfaceMessageReference(WSDLInterfaceOperation wsdlOperation)
    {
-      log.trace("New part for wsdlOperation: " + wsdlOperation.getName());
+      if (log.isTraceEnabled())
+         log.trace("New part for wsdlOperation: " + wsdlOperation.getName());
       this.wsdlOperation = wsdlOperation;
    }
 
@@ -110,7 +111,8 @@ public abstract class WSDLInterfaceMessageReference extends Extendable implement
 
    public void setElement(QName element)
    {
-      log.trace("setElement: " + element);
+      if (log.isTraceEnabled())
+         log.trace("setElement: " + element);
       this.element = element;
    }
 
@@ -142,7 +144,7 @@ public abstract class WSDLInterfaceMessageReference extends Extendable implement
       }
 
       if (xmlType == null)
-         throw new WSException("Cannot obtain xmlType for element: " + element);
+         throw NativeMessages.MESSAGES.cannotObtainXmlType(element);
 
       return xmlType;
    }

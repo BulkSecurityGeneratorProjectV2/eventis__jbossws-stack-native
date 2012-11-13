@@ -9,7 +9,7 @@
   <parent>
     <groupId>org.jboss.ws.native</groupId>
     <artifactId>jbossws-native</artifactId>
-    <version>4.0.0-SNAPSHOT</version>
+    <version>4.1.1-SNAPSHOT</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
   
@@ -41,19 +41,23 @@
             <id>all</id>
             <goals><goal>jar</goal></goals>
             <phase>package</phase>
-            <configuration>
-              <excludes>
-                <exclude>**/jbossws-jboss700/**</exclude>
-              </excludes>
-            </configuration>
           </execution>
           <execution>
-            <id>jboss700</id>
+            <id>jboss713</id>
             <goals><goal>jar</goal></goals>
             <phase>package</phase>
             <configuration>
-              <classifier>jboss700</classifier>
-              <classesDirectory>${project.build.directory}/classes/resources/jbossws-jboss700/jbossws.beans</classesDirectory>
+              <classifier>jboss713</classifier>
+              <classesDirectory>${project.build.directory}/classes/resources/jbossws-jboss713/jbossws.beans</classesDirectory>
+            </configuration>
+          </execution>
+          <execution>
+            <id>jboss720</id>
+            <goals><goal>jar</goal></goals>
+            <phase>package</phase>
+            <configuration>
+              <classifier>jboss720</classifier>
+              <classesDirectory>${project.build.directory}/classes/resources/jbossws-jboss720/jbossws.beans</classesDirectory>
             </configuration>
           </execution>
         </executions>

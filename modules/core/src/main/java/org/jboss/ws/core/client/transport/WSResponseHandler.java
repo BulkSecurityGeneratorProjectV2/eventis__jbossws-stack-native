@@ -33,8 +33,8 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBufferInputStream;
-import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelHandler.Sharable;
+import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ExceptionEvent;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
@@ -177,7 +177,7 @@ public class WSResponseHandler extends SimpleChannelUpstreamHandler
          }
          if (cancelled)
          {
-            throw new InterruptedException("Operation Cancelled");
+            throw new InterruptedException();
          }
          if (exception != null)
          {
@@ -197,11 +197,11 @@ public class WSResponseHandler extends SimpleChannelUpstreamHandler
          }
          if (cancelled)
          {
-            throw new InterruptedException("Operation Cancelled");
+            throw new InterruptedException();
          }
          if (!done)
          {
-            throw new TimeoutException("Timeout Exceeded");
+            throw new TimeoutException();
          }
          if (exception != null)
          {

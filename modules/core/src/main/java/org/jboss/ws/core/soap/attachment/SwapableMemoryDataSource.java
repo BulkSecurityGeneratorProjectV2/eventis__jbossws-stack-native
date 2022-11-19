@@ -28,6 +28,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Files;
 import java.util.ResourceBundle;
 
 import javax.activation.DataSource;
@@ -115,7 +116,7 @@ public class SwapableMemoryDataSource implements DataSource
          if (rbaos != null && rbaos.size() > maxMemorySize)
          {
             File tmpdir = IOUtils.createTempDirectory();
-            swapFile = File.createTempFile(SWAP_PREFIX, SWAP_SUFFIX, tmpdir);
+            swapFile = Files.createTempFile(tmpdir.toPath(), SWAP_PREFIX, SWAP_SUFFIX).toFile();
             swapFile.deleteOnExit();
             os = new FileOutputStream(swapFile);
             rbaos.writeTo(os);

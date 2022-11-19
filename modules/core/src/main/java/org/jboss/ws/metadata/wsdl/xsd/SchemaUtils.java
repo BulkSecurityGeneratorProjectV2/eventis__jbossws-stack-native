@@ -26,6 +26,7 @@ import static org.jboss.ws.NativeMessages.MESSAGES;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -538,7 +539,7 @@ public class SchemaUtils
       fname = fname.replace('?', '_');
       fname = fname.replace('#', '_');
       
-      return File.createTempFile("JBossWS_" + fname, ".xsd", tmpdir);
+      return Files.createTempFile(tmpdir.toPath(), "JBossWS_" + fname, ".xsd").toFile();
    }
 
    /**
